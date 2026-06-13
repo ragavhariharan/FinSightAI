@@ -10,16 +10,18 @@ export function pageFromOnboardingStatus(status) {
       return 'app';
     case 'chat_in_progress':
     case 'chat_complete':
-    case 'mcq_complete':
-    case 'data_choice_pending':
     case 'upload_complete':
       return 'onboarding-chat';
+    case 'mcq_complete':
+    case 'data_choice_pending':
+      return 'onboarding-data-choice';
     case 'not_started':
     case 'mcq_in_progress':
     default:
       return 'onboarding-mcq';
   }
 }
+
 
 /** Reset all user-specific state when logged out */
 export function emptyAuthState(page = 'landing') {

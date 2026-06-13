@@ -57,11 +57,13 @@ export async function resolveSessionState(session) {
     const profile = await getProfile(session.user.id);
     return {
       user: session.user,
+      profileMissing: false,
       ...buildAppStateFromProfile(profile),
     };
   } catch {
     return {
       user: session.user,
+      profileMissing: true,
       ...newUserOnboardingState(),
     };
   }

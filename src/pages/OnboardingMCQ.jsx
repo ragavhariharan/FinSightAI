@@ -7,6 +7,8 @@ export default function OnboardingMCQ() {
   const question = MCQ_QUESTIONS[mcqStep];
   const progress = (mcqStep / MCQ_QUESTIONS.length) * 100;
 
+  const isLoading = state.authLoading;
+
   return (
     <div style={{ minHeight:'100vh', background:'#F7F5F2', display:'flex', flexDirection:'column', alignItems:'center', padding:'40px 24px' }}>
       {/* Header */}
@@ -24,22 +26,23 @@ export default function OnboardingMCQ() {
       </div>
 
       {/* Question */}
-      <div style={{ width:'100%', maxWidth:560, animation:'fadeUp 0.35s ease' }}>
+      <div style={{ width:'100%', maxWidth:560, animation:'fadeUp 0.35s ease', opacity: isLoading ? 0.6 : 1, pointerEvents: isLoading ? 'none' : 'auto' }}>
         <h2 style={{ fontSize:27, fontWeight:700, marginBottom:32, lineHeight:1.3, letterSpacing:'-0.5px' }}>{question.q}</h2>
         {question.opts.map((text, i) => {
           const sel = mcqAnswers[mcqStep] === i;
           return (
             <HoverEl
               key={i}
-              onClick={() => selectMCQOption(i)}
+              onClick={() => !isLoading && selectMCQOption(i)}
               style={{
                 display:'flex', alignItems:'center', gap:13, padding:'15px 18px',
                 border:sel ? '2px solid #E8570A' : '2px solid #E8E8E2',
                 borderRadius:12, background:sel ? '#FFF2EC' : 'white',
-                cursor:'pointer', marginBottom:10, transition:'all 0.15s',
+                cursor: isLoading ? 'wait' : 'pointer', marginBottom:10, transition:'all 0.15s',
               }}
               hoverStyle={{ borderColor:sel ? '#E8570A' : '#C8C8C0', background:sel ? '#FFF2EC' : '#FAFAF8' }}
             >
+
               <div style={{
                 width:20, height:20, borderRadius:'50%',
                 border:sel ? '2px solid #E8570A' : '2px solid #D0D0C8',

@@ -20,6 +20,18 @@ export default function OnboardingChat() {
   const scripts = PERSONA_SCRIPTS[persona] || PERSONA_SCRIPTS['Salaried employee'];
   const messagesRef = useRef(null);
 
+  // Safety net: if we arrive at this page with no messages and no typing in progress,
+  // inject the first script question so the screen is never blank.
+  useEffect(() => {
+    if (chatMessages.length === 0 && !chatTyping) {
+      up({ chatTyping: true });
+      setTimeout(() => {
+        up({ chatMessages: [{ role: 'ai', text: scripts[0] }], chatTyping: false });
+      }, 400);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (messagesRef.current) {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight;

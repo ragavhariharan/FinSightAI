@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { signUpWithEmail, signInWithEmail, signOut, resolveSessionState } from './lib/auth';
+import { signUpWithEmail, signInWithEmail, signOut, resolveSessionState, getProfile } from './lib/auth';
 import { supabase, PERSONA_LABEL_TO_DB } from './lib/supabase';
-import { PUBLIC_PAGES, demoAppState, emptyAuthState } from './lib/routing';
+import { PUBLIC_PAGES, emptyAuthState } from './lib/routing';
+import { saveOnboardingCache, loadOnboardingCache, clearOnboardingCache, mergeWithCache } from './lib/onboardingCache';
 import { fetchTransactions, insertTransaction } from './lib/api/transactions';
 import { fetchBudgetsWithSpent, insertBudget } from './lib/api/budgets';
 import { fetchSnapshot } from './lib/api/dashboard';
@@ -202,6 +203,46 @@ export function AppProvider({ children }) {
   const up = useCallback((patch) => setState(s => ({ ...s, ...patch })), []);
   const signingOutRef = useRef(false);
   const demoModeRef = useRef(false);
+  const seedingDemoRef = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  async function fetchOnboardingChat(userId, persona, dataPath) {
+    try {
+      const { data, error } = await supabase
+        .from('onboarding_chat_messages')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const msgs = data.map(m => ({
+          role: m.role === 'assistant' ? 'ai' : 'user',
+          text: m.content
+        }));
+        
+        const lastAIChat = [...data].reverse().find(m => m.role === 'assistant');
+        const qIndex = lastAIChat ? lastAIChat.question_index : 0;
+        
+        return { chatMessages: msgs, chatQuestionIndex: qIndex };
+      }
+    } catch (err) {
+      console.error('Error fetching onboarding chat messages:', err);
+    }
+    
+    const scripts = PERSONA_SCRIPTS[persona] || PERSONA_SCRIPTS['Salaried employee'];
+    const isUpload = dataPath === 'upload';
+    const initialText = isUpload 
+      ? `I see you uploaded your bank statement. Let's verify a few details. ${scripts[0]}` 
+      : scripts[0];
+      
+    return {
+      chatMessages: [{ role: 'ai', text: initialText }],
+      chatQuestionIndex: 0
+    };
+  }
 
   const loadAppData = useCallback(async () => {
     try {
@@ -235,8 +276,8 @@ export function AppProvider({ children }) {
         window.history.replaceState(null, '', window.location.pathname);
       }
 
-      // During sign-out, ignore stale session events
-      if (signingOutRef.current && session) return;
+      // During sign-out or demo seeding, ignore session events
+      if ((signingOutRef.current || seedingDemoRef.current) && session) return;
 
       // Demo mode — no real session, keep demo dashboard
       if (!session && demoModeRef.current) {
@@ -260,12 +301,45 @@ export function AppProvider({ children }) {
       // Real login clears demo mode
       demoModeRef.current = false;
 
-      const route = await resolveSessionState(session);
+      // Avoid overwriting active onboarding page/state if session is already established for the same user.
+      // Exception: if we are on onboarding-chat with an empty messages list, fall through to restore from DB.
+      if (stateRef.current && stateRef.current.user && stateRef.current.user.id === session.user.id) {
+        const cur = stateRef.current;
+        const needsChatRestore = cur.page === 'onboarding-chat' && cur.chatMessages.length === 0;
+        if (!needsChatRestore) {
+          setState(s => ({
+            ...s,
+            user: session.user,
+            authInitializing: false,
+            authLoading: false,
+          }));
+          return;
+        }
+        // Fall through to re-fetch chatMessages from DB
+      }
+
+      const rawRoute = await resolveSessionState(session);
       if (!mounted || signingOutRef.current) return;
+
+      // Merge DB route with localStorage cache — if profile row was missing,
+      // the cache preserves the user's actual progress (MCQ step, page, persona).
+      const route = mergeWithCache(session.user.id, rawRoute, rawRoute.profileMissing);
+
+      let chatPatch = {};
+      if (route.page === 'onboarding-chat') {
+        try {
+          const profile = await getProfile(session.user.id);
+          chatPatch = await fetchOnboardingChat(session.user.id, route.persona, profile.onboarding_data_path);
+        } catch {
+          // Profile row missing — fetchOnboardingChat will use the fallback initial message
+          chatPatch = await fetchOnboardingChat(session.user.id, route.persona, 'skip');
+        }
+      }
 
       setState(s => ({
         ...s,
         ...route,
+        ...chatPatch,
         authInitializing: false,
         authLoading: false,
         transactions: [],
@@ -273,6 +347,7 @@ export function AppProvider({ children }) {
         budgets: [],
       }));
     }
+
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       applySession(session, event);
@@ -308,46 +383,162 @@ export function AppProvider({ children }) {
     if (mcqStep === MCQ_QUESTIONS.length - 1) {
       const p = MCQ_QUESTIONS[1].opts[updated[1]] || 'Salaried employee';
       up({ mcqAnswers:updated, persona:p });
+
+      // Save checkpoint: MCQ done, moving to data-choice
       if (user) {
+        saveOnboardingCache(user.id, { page: 'onboarding-data-choice', mcqStep: MCQ_QUESTIONS.length, mcqAnswers: updated, persona: p, chatQuestionIndex: 0 });
         supabase.from('profiles').update({
           mcq_answers: updated,
           persona: PERSONA_LABEL_TO_DB[p] || 'salaried_employee',
-          onboarding_status: 'chat_in_progress',
-        }).eq('id', user.id);
+          onboarding_status: 'data_choice_pending',
+        }).eq('id', user.id).then(({ error }) => {
+          if (error) console.error('Error updating profile:', error);
+        });
       }
-      setTimeout(() => startChat(p), 350);
+      goTo('onboarding-data-choice');
     } else {
       up({ mcqAnswers:updated, mcqStep:mcqStep + 1 });
+
+      // Save checkpoint: mid-MCQ
       if (user) {
+        saveOnboardingCache(user.id, { page: 'onboarding-mcq', mcqStep: mcqStep + 1, mcqAnswers: updated, persona: state.persona, chatQuestionIndex: 0 });
         supabase.from('profiles').update({
           mcq_answers: updated,
           onboarding_status: 'mcq_in_progress',
-        }).eq('id', user.id);
+        }).eq('id', user.id).then(({ error }) => {
+          if (error) console.error('Error updating profile:', error);
+        });
       }
     }
+  }
+
+  async function skipStatementUpload() {
+    const { user } = state;
+    up({ authLoading: true, authError: '' });
+    try {
+      if (user) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            onboarding_data_path: 'skip',
+            onboarding_status: 'chat_in_progress',
+          })
+          .eq('id', user.id);
+        if (error) throw error;
+      }
+      const p = state.persona || 'Salaried employee';
+      const scripts = PERSONA_SCRIPTS[p] || PERSONA_SCRIPTS['Salaried employee'];
+      const firstMsg = { role: 'ai', text: scripts[0] };
+
+      // Save first AI message to DB so page-refresh can restore it
+      if (user) {
+        await supabase.from('onboarding_chat_messages').delete().eq('user_id', user.id);
+        await supabase.from('onboarding_chat_messages').insert({
+          user_id: user.id, role: 'assistant', content: firstMsg.text, question_index: 0
+        });
+        // Save checkpoint so reload returns to chat page, not quiz step 0
+        saveOnboardingCache(user.id, { page: 'onboarding-chat', mcqStep: MCQ_QUESTIONS.length, mcqAnswers: state.mcqAnswers, persona: p, chatQuestionIndex: 0 });
+      }
+
+      // Show typing indicator briefly then reveal first message — no blank screen
+      up({ authLoading: false, page: 'onboarding-chat', chatMessages: [], chatQuestionIndex: 0, chatTyping: true, persona: p });
+      setTimeout(() => up({ chatMessages: [firstMsg], chatTyping: false }), 500);
+      return; // skip finally's authLoading reset since we already cleared it
+    } catch (err) {
+      console.error('Error skipping upload:', err);
+      up({ authError: err.message || 'Failed to update onboarding flow.' });
+    }
+    up({ authLoading: false });
+  }
+
+  async function handleStatementUpload(file) {
+    const { user } = state;
+    console.log('CSV file selected for onboarding data:', file);
+    up({ authLoading: true, authError: '' });
+    try {
+      if (user) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            onboarding_data_path: 'upload',
+            onboarding_status: 'chat_in_progress',
+          })
+          .eq('id', user.id);
+        if (error) throw error;
+      }
+      const p = state.persona || 'Salaried employee';
+      const scripts = PERSONA_SCRIPTS[p] || PERSONA_SCRIPTS['Salaried employee'];
+      const firstText = `I see you uploaded your bank statement. Let's verify a few details. ${scripts[0]}`;
+      const firstMsg = { role: 'ai', text: firstText };
+
+      // Save first AI message to DB so page-refresh can restore it
+      if (user) {
+        await supabase.from('onboarding_chat_messages').delete().eq('user_id', user.id);
+        await supabase.from('onboarding_chat_messages').insert({
+          user_id: user.id, role: 'assistant', content: firstText, question_index: 0
+        });
+        // Save checkpoint so reload returns to chat page, not quiz step 0
+        saveOnboardingCache(user.id, { page: 'onboarding-chat', mcqStep: MCQ_QUESTIONS.length, mcqAnswers: state.mcqAnswers, persona: p, chatQuestionIndex: 0 });
+      }
+
+      up({ authLoading: false, page: 'onboarding-chat', chatMessages: [], chatQuestionIndex: 0, chatTyping: true, persona: p });
+      setTimeout(() => up({ chatMessages: [firstMsg], chatTyping: false }), 500);
+      return;
+    } catch (err) {
+      console.error('Error handling statement upload:', err);
+      up({ authError: err.message || 'Failed to initialize database with statement.' });
+    }
+    up({ authLoading: false });
   }
 
   function sendChatMessage() {
     const { chatInputVal, chatMessages, chatQuestionIndex, persona, user } = state;
     if (!chatInputVal.trim()) return;
     const scripts = PERSONA_SCRIPTS[persona] || PERSONA_SCRIPTS['Salaried employee'];
-    const msgs = [...chatMessages, { role:'user', text:chatInputVal }];
-    up({ chatMessages:msgs, chatInputVal:'', chatTyping:true });
+    const userMsg = { role: 'user', text: chatInputVal };
+    const msgs = [...chatMessages, userMsg];
+    up({ chatMessages: msgs, chatInputVal: '', chatTyping: true });
+
+    // Persist user message to DB
+    if (user) {
+      supabase.from('onboarding_chat_messages').insert({
+        user_id: user.id, role: 'user', content: chatInputVal, question_index: chatQuestionIndex
+      }).then(({ error }) => { if (error) console.warn('Chat save error:', error); });
+    }
+
     const next = chatQuestionIndex + 1;
     if (next >= scripts.length) {
+      const finalText = "Perfect! I have a clear picture of your finances. Setting up your personalized dashboard now...";
       setTimeout(() => {
-        const final = [...msgs, { role:'ai', text:"Perfect! I have a clear picture of your finances. Setting up your personalized dashboard now..." }];
-        up({ chatMessages:final, chatTyping:false, chatQuestionIndex:next });
+        const final = [...msgs, { role: 'ai', text: finalText }];
+        up({ chatMessages: final, chatTyping: false, chatQuestionIndex: next });
+
+        // Persist final AI message
+        if (user) {
+          supabase.from('onboarding_chat_messages').insert({
+            user_id: user.id, role: 'assistant', content: finalText, question_index: next
+          }).then(({ error }) => { if (error) console.warn('Chat save error:', error); });
+        }
+
         setTimeout(() => {
           if (user) {
             supabase.from('profiles').update({ onboarding_status: 'complete' }).eq('id', user.id);
+            clearOnboardingCache(user.id); // onboarding done — remove local checkpoint
           }
-          up({ page:'app', activeNav:'dashboard', aiMessages:[{ role:'ai', text:`Welcome! Your ${persona} profile is live. Ask me anything about your finances, or just tell me about a transaction.` }] });
+          up({ page: 'app', activeNav: 'dashboard', aiMessages: [{ role: 'ai', text: `Welcome! Your ${persona} profile is live. Ask me anything about your finances, or just tell me about a transaction.` }] });
         }, 1600);
       }, 1100);
     } else {
+      const aiReply = scripts[next];
       setTimeout(() => {
-        up({ chatMessages:[...msgs, { role:'ai', text:scripts[next] }], chatTyping:false, chatQuestionIndex:next });
+        up({ chatMessages: [...msgs, { role: 'ai', text: aiReply }], chatTyping: false, chatQuestionIndex: next });
+
+        // Persist AI reply
+        if (user) {
+          supabase.from('onboarding_chat_messages').insert({
+            user_id: user.id, role: 'assistant', content: aiReply, question_index: next
+          }).then(({ error }) => { if (error) console.warn('Chat save error:', error); });
+        }
       }, 1100);
     }
   }
@@ -369,17 +560,128 @@ export function AppProvider({ children }) {
       } catch { /* continue into demo */ }
       signingOutRef.current = false;
     }
-    demoModeRef.current = true;
-    const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
-    const demoBudgets = INITIAL_BUDGETS.map(b => ({
-      category: b.cat,
-      icon: b.icon,
-      color: b.color,
-      limit_amount: b.limit,
-      spent: b.spent,
-      month: currentMonth,
-    }));
-    up({ ...demoAppState(), transactions: TRANSACTIONS, budgets: demoBudgets, snapshot: null });
+
+    seedingDemoRef.current = true;
+    demoModeRef.current = false;
+    up({ authLoading: true, authError: '' });
+    const email = 'demo@finsight.app';
+    const password = 'DemoUser123!';
+    const fullName = 'Arjun Kumar';
+
+    try {
+      let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { data: { full_name: fullName } },
+          });
+          if (signUpError) throw signUpError;
+          data = signUpData;
+        } else {
+          throw error;
+        }
+      }
+
+      const userId = data.user.id;
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          is_demo: true,
+          persona: 'salaried_employee',
+          onboarding_status: 'complete',
+          onboarding_data_path: 'demo'
+        })
+        .eq('id', userId);
+
+      if (profileError) throw profileError;
+
+      const { count, error: countError } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      if (countError) throw countError;
+
+      if (count === 0) {
+        const dateMap = {
+          'Jun 13, 2025': '2026-06-13',
+          'Jun 12, 2025': '2026-06-12',
+          'Jun 11, 2025': '2026-06-11',
+          'Jun 10, 2025': '2026-06-10',
+          'Jun 9, 2025':  '2026-06-09',
+          'Jun 8, 2025':  '2026-06-08',
+          'Jun 7, 2025':  '2026-06-07',
+          'Jun 6, 2025':  '2026-06-06',
+          'Jun 5, 2025':  '2026-06-05',
+          'Jun 4, 2025':  '2026-06-04',
+          'Jun 3, 2025':  '2026-06-03',
+        };
+
+        const seededTxns = TRANSACTIONS.map(tx => {
+          const dateStr = dateMap[tx.date] || '2026-06-13';
+          let sType = 'flexible';
+          if (['Housing', 'Utilities', 'Insurance', 'Groceries'].includes(tx.category)) sType = 'routine';
+          else if (['Food & Dining', 'Transport', 'Health', 'Fitness'].includes(tx.category)) sType = 'flexible';
+          else sType = 'impulse';
+
+          return {
+            user_id: userId,
+            txn_date: dateStr,
+            name: tx.name,
+            category: tx.category,
+            emoji: tx.emoji,
+            account: tx.account,
+            amount: tx.amount,
+            source: 'seed',
+            spending_type: sType
+          };
+        });
+
+        const { error: seedError } = await supabase
+          .from('transactions')
+          .insert(seededTxns);
+
+        if (seedError) throw seedError;
+
+        const defaultBudgets = [
+          { user_id: userId, category:'Housing',              icon:'🏠', limit_amount:26000, month:'2026-06-01', color:'#0EA5E9' },
+          { user_id: userId, category:'Food & Dining',        icon:'🍔', limit_amount:9000,  month:'2026-06-01', color:'#F59E0B' },
+          { user_id: userId, category:'Shopping',             icon:'🛍', limit_amount:7000,  month:'2026-06-01', color:'#EC4899' },
+          { user_id: userId, category:'Utilities & Insurance',icon:'⚡', limit_amount:10000, month:'2026-06-01', color:'#6366F1' },
+          { user_id: userId, category:'Transport',            icon:'🚗', limit_amount:4000,  month:'2026-06-01', color:'#8B5CF6' },
+          { user_id: userId, category:'Health & Fitness',     icon:'💪', limit_amount:3000,  month:'2026-06-01', color:'#EF4444' },
+        ];
+
+        const { error: budgetError } = await supabase
+          .from('budgets')
+          .insert(defaultBudgets);
+
+        if (budgetError) throw budgetError;
+      }
+
+      seedingDemoRef.current = false;
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession) {
+        const patch = await resolveSessionState(currentSession);
+        setState(s => ({
+          ...s,
+          ...patch,
+          user: currentSession.user,
+          authInitializing: false,
+          authLoading: false
+        }));
+      }
+    } catch (err) {
+      seedingDemoRef.current = false;
+      console.error('Demo login error:', err);
+      up({ authError: err.message || 'Demo login failed' });
+    } finally {
+      up({ authLoading: false });
+    }
   }
 
   async function addTransaction(txData) {
@@ -395,6 +697,7 @@ export function AppProvider({ children }) {
     await insertBudget({ ...budgetData, user_id: user.id });
     await loadAppData();
   }
+
 
   async function submitAuth(e) {
     e.preventDefault();
@@ -428,6 +731,9 @@ export function AppProvider({ children }) {
     }
     signingOutRef.current = true;
     demoModeRef.current = false;
+    if (state.user) {
+      clearOnboardingCache(state.user.id);
+    }
     try {
       await signOut();
     } catch (err) {
@@ -445,7 +751,7 @@ export function AppProvider({ children }) {
     }));
   }
 
-  const value = { state, up, goTo, startChat, selectMCQOption, sendChatMessage, sendAIMessage, tryDemo, submitAuth, handleSignOut, addTransaction, addBudget, loadAppData };
+  const value = { state, up, goTo, startChat, selectMCQOption, sendChatMessage, sendAIMessage, tryDemo, submitAuth, handleSignOut, addTransaction, addBudget, loadAppData, skipStatementUpload, handleStatementUpload };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
