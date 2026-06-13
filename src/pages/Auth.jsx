@@ -1,126 +1,93 @@
 import { useApp } from '../context';
-import { HoverEl } from '../utils';
+import Logo from '../components/ui/Logo';
+import Icon from '../components/ui/Icon';
 import { signInWithGoogle } from '../lib/auth';
+
+function GoogleIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 18 18" aria-hidden>
+      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.89 2.68-6.62Z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z" />
+      <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33Z" />
+      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z" />
+    </svg>
+  );
+}
 
 export default function Auth() {
   const { state, up, goTo, tryDemo, submitAuth } = useApp();
   const { authMode, authEmail, authPassword, authName, authLoading, authError } = state;
+  const isSignup = authMode === 'signup';
 
   async function handleGoogle() {
-    up({ authError:'' });
+    up({ authError: '' });
     try {
       await signInWithGoogle();
     } catch (err) {
       up({ authError: err.message || 'Google sign-in failed' });
     }
   }
-  const isSignup = authMode === 'signup';
-
-  const tabBase = { flex:1, padding:'8px 12px', border:'none', borderRadius:7, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' };
 
   return (
-    <div style={{ minHeight:'100vh', background:'#F7F5F2', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-      <div style={{ background:'white', borderRadius:20, padding:40, width:'100%', maxWidth:400, border:'1px solid #E8E8E2', boxShadow:'0 4px 24px rgba(0,0,0,0.07)' }}>
-        {/* Logo */}
-        <div style={{ display:'flex', alignItems:'center', gap:10, justifyContent:'center', marginBottom:32 }}>
-          <svg width="34" height="34" viewBox="0 0 34 34"><rect width="34" height="34" rx="9" fill="#E8570A" /><path d="M8 25L14 16.5L19.5 20L26 10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
-          <span style={{ fontSize:20, fontWeight:700, letterSpacing:'-0.3px' }}>FinSight</span>
+    <div className="fs-auth-center">
+      <div className="fs-auth-card">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 26 }}>
+          <Logo showText size={32} />
         </div>
 
-        <h1 style={{ fontSize:22, fontWeight:700, textAlign:'center', marginBottom:6 }}>
+        <h1 className="fs-h2" style={{ textAlign: 'center', marginBottom: 6 }}>
           {isSignup ? 'Create your account' : 'Welcome back'}
         </h1>
-        <p style={{ fontSize:14, color:'#6E6E73', textAlign:'center', marginBottom:28 }}>
-          {isSignup ? 'Start understanding your finances in 3 minutes' : 'Sign in to your FinSight account'}
+        <p className="fs-subtitle" style={{ textAlign: 'center', marginBottom: 26 }}>
+          {isSignup ? 'Start understanding your finances in minutes' : 'Sign in to continue'}
         </p>
 
-        {/* Toggle */}
-        <div style={{ display:'flex', background:'#F5F5F3', borderRadius:10, padding:4, marginBottom:24, gap:4 }}>
-          <button
-            onClick={() => up({ authMode:'signup' })}
-            style={{ ...tabBase, background:isSignup ? 'white' : 'transparent', color:isSignup ? '#1A1A1A' : '#6E6E73', boxShadow:isSignup ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-          >Create account</button>
-          <button
-            onClick={() => up({ authMode:'login' })}
-            style={{ ...tabBase, background:!isSignup ? 'white' : 'transparent', color:!isSignup ? '#1A1A1A' : '#6E6E73', boxShadow:!isSignup ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-          >Sign in</button>
+        <div className="fs-tab-group">
+          <button className={`fs-tab ${isSignup ? 'active' : ''}`} onClick={() => up({ authMode: 'signup' })}>Create account</button>
+          <button className={`fs-tab ${!isSignup ? 'active' : ''}`} onClick={() => up({ authMode: 'login' })}>Sign in</button>
         </div>
 
         <form onSubmit={submitAuth}>
           {isSignup && (
-            <div style={{ marginBottom:16 }}>
-              <label style={{ display:'block', fontSize:13, fontWeight:600, marginBottom:6 }}>Full name</label>
-              <input
-                value={authName}
-                onChange={e => up({ authName:e.target.value })}
-                type="text"
-                placeholder="Arjun Kumar"
-                style={{ width:'100%', padding:'11px 14px', border:'1.5px solid #E8E8E2', borderRadius:9, fontSize:15, color:'#1A1A1A', background:'white', fontFamily:'inherit' }}
-              />
+            <div className="fs-field">
+              <label className="fs-field-label">Full name</label>
+              <input className="fs-input" value={authName} onChange={e => up({ authName: e.target.value })} placeholder="Arjun Kumar" />
             </div>
           )}
-          <div style={{ marginBottom:16 }}>
-            <label style={{ display:'block', fontSize:13, fontWeight:600, marginBottom:6 }}>Email address</label>
-            <input
-              value={authEmail}
-              onChange={e => up({ authEmail:e.target.value })}
-              type="email"
-              placeholder="arjun@gmail.com"
-              style={{ width:'100%', padding:'11px 14px', border:'1.5px solid #E8E8E2', borderRadius:9, fontSize:15, color:'#1A1A1A', background:'white', fontFamily:'inherit' }}
-            />
+          <div className="fs-field">
+            <label className="fs-field-label">Email</label>
+            <input className="fs-input" type="email" value={authEmail} onChange={e => up({ authEmail: e.target.value })} placeholder="you@email.com" />
           </div>
-          <div style={{ marginBottom:24 }}>
-            <label style={{ display:'block', fontSize:13, fontWeight:600, marginBottom:6 }}>Password</label>
-            <input
-              value={authPassword}
-              onChange={e => up({ authPassword:e.target.value })}
-              type="password"
-              placeholder="At least 8 characters"
-              style={{ width:'100%', padding:'11px 14px', border:'1.5px solid #E8E8E2', borderRadius:9, fontSize:15, color:'#1A1A1A', background:'white', fontFamily:'inherit' }}
-            />
+          <div className="fs-field">
+            <label className="fs-field-label">Password</label>
+            <input className="fs-input" type="password" value={authPassword} onChange={e => up({ authPassword: e.target.value })} placeholder="At least 8 characters" />
           </div>
           {authError && (
-            <p style={{ fontSize:13, color:'#D63B2F', marginBottom:12, textAlign:'center' }}>{authError}</p>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--fs-danger)', marginBottom: 14, textAlign: 'center', lineHeight: 1.5, padding: '10px 12px', background: 'var(--fs-danger-soft)', borderRadius: 'var(--fs-radius-sm)', border: '1px solid #FECDCA' }}>{authError}</p>
           )}
-          <HoverEl
-            as="button"
-            type="submit"
-            disabled={authLoading}
-            style={{ width:'100%', background:authLoading ? '#F5A574' : '#E8570A', color:'white', border:'none', padding:13, borderRadius:10, fontSize:15, fontWeight:700, cursor:authLoading ? 'wait' : 'pointer', marginBottom:12, fontFamily:'inherit' }}
-            hoverStyle={{ background:authLoading ? '#F5A574' : '#C94A06' }}
-          >{authLoading ? 'Please wait…' : isSignup ? 'Create account' : 'Sign in'}</HoverEl>
+          <button type="submit" className="fs-btn fs-btn-primary" style={{ width: '100%', marginBottom: 12 }} disabled={authLoading}>
+            {authLoading ? 'Please wait…' : isSignup ? 'Create account' : 'Sign in'}
+          </button>
         </form>
 
-        <HoverEl
-          as="button"
-          onClick={handleGoogle}
-          style={{ width:'100%', background:'white', color:'#1A1A1A', border:'1.5px solid #E8E8E2', padding:12, borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', marginBottom:12, fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}
-          hoverStyle={{ background:'#F5F5F3' }}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.616z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
-          Continue with Google
-        </HoverEl>
+        <button className="fs-btn fs-btn-secondary" style={{ width: '100%', marginBottom: 12 }} onClick={handleGoogle}>
+          <GoogleIcon /> Continue with Google
+        </button>
 
-        <div style={{ display:'flex', alignItems:'center', gap:12, margin:'4px 0 12px' }}>
-          <div style={{ flex:1, height:1, background:'#E8E8E2' }} />
-          <span style={{ fontSize:12, color:'#9B9B9F' }}>or</span>
-          <div style={{ flex:1, height:1, background:'#E8E8E2' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0 12px' }}>
+          <div style={{ flex: 1, height: 1, background: 'var(--fs-border)' }} />
+          <span className="fs-subtitle" style={{ fontSize: '0.75rem' }}>or</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--fs-border)' }} />
         </div>
 
-        <HoverEl
-          as="button"
-          onClick={tryDemo}
-          style={{ width:'100%', background:'white', color:'#1A1A1A', border:'1.5px solid #E8E8E2', padding:12, borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}
-          hoverStyle={{ background:'#F5F5F3' }}
-        >Continue as Demo User</HoverEl>
+        <button className="fs-btn fs-btn-secondary" style={{ width: '100%' }} onClick={tryDemo}>
+          Continue as demo user
+        </button>
 
-        <div style={{ textAlign:'center', marginTop:20 }}>
-          <HoverEl
-            as="button"
-            onClick={() => goTo('landing')}
-            style={{ background:'none', border:'none', fontSize:13, color:'#9B9B9F', cursor:'pointer', fontFamily:'inherit' }}
-            hoverStyle={{ color:'#1A1A1A' }}
-          >Back to home</HoverEl>
+        <div style={{ textAlign: 'center', marginTop: 20 }}>
+          <button className="fs-btn fs-btn-ghost fs-btn-sm" onClick={() => goTo('landing')} style={{ gap: 6 }}>
+            <Icon name="arrowLeft" size={15} /> Back to home
+          </button>
         </div>
       </div>
     </div>

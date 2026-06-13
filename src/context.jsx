@@ -2,175 +2,43 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef } f
 import { signUpWithEmail, signInWithEmail, signOut, resolveSessionState } from './lib/auth';
 import { supabase, PERSONA_LABEL_TO_DB } from './lib/supabase';
 import { PUBLIC_PAGES, demoAppState, emptyAuthState } from './lib/routing';
+import { loadAppData, clearDemoSession } from './lib/data';
+import { sendCopilotMessage, getLocalCopilotResponse } from './lib/api/copilot';
+import { completeOnboarding } from './lib/api/onboarding';
+import { formatAuthError } from './lib/formatAuthError';
+import { loadSettings, saveSettings, applyTheme, applyLayoutWidths } from './lib/settings';
+import { groupTransactions, mapTransactionRow } from './lib/format';
+import { recordTransaction, undoTransaction } from './lib/transactionFlow';
 
-export const TRANSACTIONS = [
-  { id:1,  date:'Jun 13, 2025', name:'Swiggy',               category:'Food & Dining', emoji:'🍔', account:'HDFC Savings', amount:-480   },
-  { id:2,  date:'Jun 13, 2025', name:'Uber',                 category:'Transport',     emoji:'🚗', account:'HDFC Savings', amount:-220   },
-  { id:3,  date:'Jun 12, 2025', name:'Salary — Infosys',     category:'Paychecks',     emoji:'💼', account:'HDFC Savings', amount:65000  },
-  { id:4,  date:'Jun 12, 2025', name:'Amazon.in',            category:'Shopping',      emoji:'🛍', account:'ICICI Credit', amount:-2199  },
-  { id:5,  date:'Jun 11, 2025', name:'HDFC Home Loan EMI',   category:'Housing',       emoji:'🏠', account:'HDFC Savings', amount:-22000 },
-  { id:6,  date:'Jun 11, 2025', name:'Netflix',              category:'Entertainment', emoji:'🎬', account:'ICICI Credit', amount:-649   },
-  { id:7,  date:'Jun 10, 2025', name:'BigBazaar Groceries',  category:'Groceries',     emoji:'🛒', account:'HDFC Savings', amount:-3200  },
-  { id:8,  date:'Jun 10, 2025', name:'Airtel Broadband',     category:'Utilities',     emoji:'📡', account:'HDFC Savings', amount:-999   },
-  { id:9,  date:'Jun 9, 2025',  name:'LIC Premium',          category:'Insurance',     emoji:'🛡', account:'HDFC Savings', amount:-3500  },
-  { id:10, date:'Jun 9, 2025',  name:'Apollo Pharmacy',      category:'Health',        emoji:'💊', account:'HDFC Savings', amount:-680   },
-  { id:11, date:'Jun 8, 2025',  name:'Cult.fit Membership',  category:'Fitness',       emoji:'💪', account:'ICICI Credit', amount:-1500  },
-  { id:12, date:'Jun 8, 2025',  name:'Myntra',               category:'Shopping',      emoji:'👕', account:'ICICI Credit', amount:-3499  },
-  { id:13, date:'Jun 7, 2025',  name:'BESCOM Electricity',   category:'Utilities',     emoji:'⚡', account:'HDFC Savings', amount:-2100  },
-  { id:14, date:'Jun 7, 2025',  name:'Zomato',               category:'Food & Dining', emoji:'🍕', account:'HDFC Savings', amount:-550   },
-  { id:15, date:'Jun 6, 2025',  name:'Rapido',               category:'Transport',     emoji:'🏍', account:'HDFC Savings', amount:-180   },
-  { id:16, date:'Jun 5, 2025',  name:'HPCL Petrol',          category:'Transport',     emoji:'⛽', account:'HDFC Savings', amount:-2200  },
-  { id:17, date:'Jun 4, 2025',  name:'Cafe Coffee Day',      category:'Food & Dining', emoji:'☕', account:'HDFC Savings', amount:-380   },
-  { id:18, date:'Jun 3, 2025',  name:'Society Maintenance',  category:'Housing',       emoji:'🏢', account:'HDFC Savings', amount:-2000  },
-];
+const COPILOT_SESSION_KEY = 'finsight_copilot_msgs';
 
-export const MCQ_QUESTIONS = [
-  { q:'How often do you receive income?',           opts:['Every day','Every week','Monthly (salary)','Irregularly'] },
-  { q:'What best describes you?',                   opts:['Student','Salaried employee','Daily wage / gig worker','Business owner'] },
-  { q:'What is your primary monthly expense?',      opts:['Rent or home loan EMI','Food and groceries','Education / tuition fees','Business costs'] },
-  { q:'How do you currently manage money?',         opts:["I don't track at all","Mental notes only","Spreadsheet or diary","Another finance app"] },
-  { q:'What would you most like FinSight to help with?', opts:['Save more each month','Understand where money goes','Plan for a big goal','Manage business finances'] },
-];
-
-export const PERSONA_SCRIPTS = {
-  'Salaried employee': [
-    "Hi! I am FinSight. Let's build your financial picture. What's your monthly take-home salary after tax?",
-    "Got it. What are your fixed monthly commitments — rent, home loan EMI, or insurance?",
-    "How much do you typically spend on food and groceries each month?",
-    "Do you have any savings goals right now — an emergency fund, a big purchase, or retirement?",
-    "Last one: roughly what percentage of your income do you manage to save each month?",
-  ],
-  'Student': [
-    "Hi! I am FinSight. Let's set up your profile. What's your monthly allowance or part-time income?",
-    "What are your biggest regular expenses — food delivery, rent, subscriptions?",
-    "Do you have any regular bills you pay yourself, like your phone or internet?",
-    "Any savings goals, even small ones — like building an emergency fund?",
-    "Do you have any loans or credit card debt right now?",
-  ],
-  'Daily wage / gig worker': [
-    "Hi! I am FinSight. On a good week, roughly how much do you earn?",
-    "How much does your income vary week to week — a little, or a lot?",
-    "What's your biggest regular expense each month?",
-    "Do you have any savings set aside for slow weeks or emergencies?",
-    "Any loans or informal debts you are repaying right now?",
-  ],
-  'Business owner': [
-    "Hi! I am FinSight. Let's map your business finances. What's your typical monthly revenue?",
-    "What are your main operating costs — rent, staff, inventory, or utilities?",
-    "Do you keep personal and business finances separate?",
-    "What's the biggest financial challenge in your business right now?",
-    "Do you have any business loans or credit lines outstanding?",
-  ],
-};
-
-export const INITIAL_BUDGETS = [
-  { cat:'Housing',              icon:'🏠', spent:24000, limit:26000, color:'#0EA5E9' },
-  { cat:'Food & Dining',        icon:'🍔', spent:7010,  limit:9000,  color:'#F59E0B' },
-  { cat:'Shopping',             icon:'🛍', spent:5698,  limit:7000,  color:'#EC4899' },
-  { cat:'Utilities & Insurance',icon:'⚡', spent:9099,  limit:10000, color:'#6366F1' },
-  { cat:'Transport',            icon:'🚗', spent:2600,  limit:4000,  color:'#8B5CF6' },
-  { cat:'Health & Fitness',     icon:'💪', spent:2180,  limit:3000,  color:'#EF4444' },
-];
-
-export function buildForecast() {
-  const total = 18664;
-  const raw = Array.from({ length:30 }, (_, i) => {
-    const base = Math.round(total * (i / 29));
-    const noise = Math.round(Math.sin(i * 1.1) * 420 + Math.cos(i * 0.75) * 280);
-    return Math.max(0, base + noise);
-  });
-  raw[29] = total;
-  const w = 560, h = 110, pad = 6;
-  const max = Math.max(...raw) + 1200;
-  const pts = raw.map((d, i) => ({ x:(i / 29) * w, y:h - pad - (d / max) * (h - pad * 2) }));
-  const line = pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(0) + ' ' + p.y.toFixed(0)).join(' ');
-  const area = line + ' L ' + w + ' ' + h + ' L 0 ' + h + ' Z';
-  return { line, area };
+function copilotWelcome(persona, fullName) {
+  const first = (fullName || '').split(' ')[0];
+  return `Hi${first ? ` ${first}` : ''}! I'm your FinSight copilot. Log transactions or ask about your ${persona || 'finances'}.`;
 }
 
-export function buildDonut() {
-  const cats = [
-    { name:'Housing',       amount:24000, color:'#0EA5E9' },
-    { name:'Food & Dining', amount:7010,  color:'#F59E0B' },
-    { name:'Shopping',      amount:5698,  color:'#EC4899' },
-    { name:'Utilities',     amount:9099,  color:'#6366F1' },
-    { name:'Transport',     amount:2600,  color:'#8B5CF6' },
-    { name:'Health & Fitness', amount:2180, color:'#EF4444' },
-  ];
-  const total = cats.reduce((s, c) => s + c.amount, 0);
-  const cx = 100, cy = 100, R = 78, r = 50;
-  let a = -Math.PI / 2;
-  return cats.map(c => {
-    const da = (c.amount / total) * 2 * Math.PI;
-    const ea = a + da;
-    const g = 0.022;
-    const sa = a + g, fa = ea - g;
-    const large = (fa - sa) > Math.PI ? 1 : 0;
-    const x1 = (cx + R * Math.cos(sa)).toFixed(1), y1 = (cy + R * Math.sin(sa)).toFixed(1);
-    const x2 = (cx + R * Math.cos(fa)).toFixed(1), y2 = (cy + R * Math.sin(fa)).toFixed(1);
-    const x3 = (cx + r * Math.cos(fa)).toFixed(1), y3 = (cy + r * Math.sin(fa)).toFixed(1);
-    const x4 = (cx + r * Math.cos(sa)).toFixed(1), y4 = (cy + r * Math.sin(sa)).toFixed(1);
-    const d = `M${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2} L${x3} ${y3} A${r} ${r} 0 ${large} 0 ${x4} ${y4} Z`;
-    a = ea;
-    return { ...c, d, pct:((c.amount / total) * 100).toFixed(1), totalStr:'₹' + c.amount.toLocaleString('en-IN') };
-  });
+function loadCopilotFromSession(persona, fullName) {
+  try {
+    const raw = sessionStorage.getItem(COPILOT_SESSION_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [{ role: 'ai', text: copilotWelcome(persona, fullName) }];
 }
 
-export function buildGauge() {
-  const score = 72, cx = 60, cy = 60, r = 46;
-  const circ = 2 * Math.PI * r;
-  const offset = circ * (1 - score / 100);
-  return { score, color:'#1A8A4A', circumference:circ.toFixed(1), dashOffset:offset.toFixed(1), transform:`rotate(-90 ${cx} ${cy})` };
-}
-
-export function getAIReply(q) {
-  const ql = q.toLowerCase();
-  if (ql.includes('overspend') || ql.includes('spend too'))
-    return "Your biggest overspend this month is Shopping — ₹5,698 vs your ₹7,000 budget. You're also 40% above your food delivery average. Everything else is on track.";
-  if (ql.includes('cut') || ql.includes('reduce') || ql.includes('save more'))
-    return "Top 3 cuts: (1) Food delivery — cooking 2 more days/week saves ~₹320/month. (2) Impulse shopping — ₹5,698 vs ₹2,100 avg. (3) Review streaming subscriptions — you may have overlap.";
-  if (ql.includes('forecast') || ql.includes('project'))
-    return "At current pace you will save ₹18,664 in June — 28.7%. Skip one shopping trip and that rises to ₹22,000+. Want me to model a specific scenario?";
-  if (ql.includes('health') || ql.includes('score'))
-    return "Your Financial Health Score is 72/100. Strengths: stable income, low EMI-to-income ratio (34%), consistent bill payments. Gap: emergency fund is 1.4 months — target is 3 months.";
-  if (ql.includes('afford') || ql.includes('can i buy') || ql.includes('can i get'))
-    return "Running that scenario: a one-time ₹15,000 purchase would cut this month's savings to ~₹3,664 (5.6%). Your budget can absorb it, but you would be at your limit.";
-  if (ql.includes('₹') || ql.includes('spent') || ql.includes('paid') || ql.includes('bought')) {
-    const m = ql.match(/₹[\d,]+|\d{3,}/);
-    const amt = m ? '₹' + m[0].replace('₹', '').replace(',', '') : 'that amount';
-    return `Got it — logged ${amt} as an expense. Your Spending DNA and forecast have updated. Daily budget buffer is now ₹412.`;
-  }
-  return "Based on your Salaried employee profile, you're tracking well this month. The biggest opportunity is cutting impulse shopping. Want a detailed breakdown of any category?";
-}
-
-export function getTxGroups(txSearch) {
-  const q = txSearch.toLowerCase();
-  const filtered = q
-    ? TRANSACTIONS.filter(t => t.name.toLowerCase().includes(q) || t.category.toLowerCase().includes(q))
-    : TRANSACTIONS;
-  const map = {};
-  filtered.forEach(t => {
-    if (!map[t.date]) map[t.date] = { date:t.date, items:[] };
-    map[t.date].items.push(t);
-  });
-  return Object.values(map).map(g => {
-    const net = g.items.reduce((s, t) => s + t.amount, 0);
-    return {
-      ...g,
-      totalStr: (net > 0 ? '+' : '') + '₹' + Math.abs(net).toLocaleString('en-IN'),
-      items: g.items.map(t => ({
-        ...t,
-        amountStr: (t.amount > 0 ? '+' : '') + '₹' + Math.abs(t.amount).toLocaleString('en-IN'),
-        amountColor: t.amount > 0 ? '#1A8A4A' : '#1A1A1A',
-      })),
-    };
-  });
+function saveCopilotToSession(msgs) {
+  try {
+    sessionStorage.setItem(COPILOT_SESSION_KEY, JSON.stringify(msgs));
+  } catch { /* ignore */ }
 }
 
 const AppContext = createContext({});
 
 export function AppProvider({ children }) {
-  const [state, setState] = useState({
+  const [state, setState] = useState(() => {
+    const settings = loadSettings();
+    applyTheme(settings.theme);
+    applyLayoutWidths(settings.sidebarWidth, settings.aiPanelWidth);
+    return {
     page:'landing',
     authInitializing:true,
     user:null,
@@ -179,81 +47,82 @@ export function AppProvider({ children }) {
     authMode:'signup',
     authEmail:'', authPassword:'', authName:'',
     mcqStep:0, mcqAnswers:{}, persona:'Salaried employee',
-    chatMessages:[], chatInputVal:'', chatTyping:false, chatQuestionIndex:0,
+    onboardingStep: 0,
+    questionnaire: {},
     activeNav:'dashboard', showAI:true,
     aiMessages:[], aiInputVal:'', aiTyping:false,
     txSearch:'',
-    budgets:INITIAL_BUDGETS,
+    transactions:[],
+    budgets:[],
+    snapshot:null,
+    dataLoading:false,
     authLoading:false,
     authError:'',
     isDemoMode:false,
+    settings,
+  };
   });
 
   const up = useCallback((patch) => setState(s => ({ ...s, ...patch })), []);
   const signingOutRef = useRef(false);
   const demoModeRef = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  // Session listener — single source of truth for auth routing
+  const refreshAppData = useCallback(async () => {
+    const s = stateRef.current;
+    if (!s.user && !s.isDemoMode) return;
+    up({ dataLoading: true });
+    try {
+      const data = await loadAppData(s.isDemoMode);
+      up({ ...data, dataLoading: false });
+    } catch (err) {
+      console.error(err);
+      up({ dataLoading: false });
+    }
+  }, [up]);
+
   useEffect(() => {
     let mounted = true;
 
-    async function applySession(session, event) {
+    async function applySession(session) {
       if (!mounted) return;
-
       if (window.location.hash.includes('access_token')) {
         window.history.replaceState(null, '', window.location.pathname);
       }
-
-      // During sign-out, ignore stale session events
       if (signingOutRef.current && session) return;
-
-      // Demo mode — no real session, keep demo dashboard
       if (!session && demoModeRef.current) {
         setState(s => ({ ...s, authInitializing: false }));
         return;
       }
-
       if (!session) {
         demoModeRef.current = false;
-        setState(s => ({
-          ...s,
-          ...emptyAuthState('landing'),
-          authInitializing: false,
-          budgets: INITIAL_BUDGETS,
-        }));
+        setState(s => ({ ...s, ...emptyAuthState('landing'), authInitializing: false, transactions: [], budgets: [], snapshot: null }));
         return;
       }
-
-      // Real login clears demo mode
       demoModeRef.current = false;
-
       const route = await resolveSessionState(session);
       if (!mounted || signingOutRef.current) return;
-
-      setState(s => ({
-        ...s,
-        ...route,
-        authInitializing: false,
-        authLoading: false,
-        budgets: INITIAL_BUDGETS,
-      }));
+      setState(s => ({ ...s, ...route, authInitializing: false, authLoading: false, transactions: [], budgets: [], snapshot: null }));
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      applySession(session, event);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session);
     });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
+
+  useEffect(() => {
+    if (state.page === 'app' && (state.user || state.isDemoMode)) {
+      refreshAppData();
+      const welcome = loadCopilotFromSession(state.persona, state.fullName);
+      up({ aiMessages: welcome });
+    }
+  }, [state.page, state.user, state.isDemoMode, refreshAppData, up]);
 
   function goTo(page, extra = {}) {
     setState(s => {
-      // Logged-in users cannot browse landing/auth without signing out
       if (s.user && PUBLIC_PAGES.includes(page)) return s;
-      // Logged-out users cannot access app/onboarding without auth (except demo)
       if (!s.user && !s.isDemoMode && !PUBLIC_PAGES.includes(page)) {
         return { ...s, page: 'auth', authMode: 'signup', ...extra };
       }
@@ -261,131 +130,176 @@ export function AppProvider({ children }) {
     });
   }
 
-  function startChat(persona) {
-    const scripts = PERSONA_SCRIPTS[persona] || PERSONA_SCRIPTS['Salaried employee'];
-    up({ page:'onboarding-chat', chatMessages:[], chatQuestionIndex:0, chatTyping:true, persona });
-    setTimeout(() => up({ chatMessages:[{ role:'ai', text:scripts[0] }], chatTyping:false }), 900);
+  function updateSettings(patch) {
+    const next = saveSettings(patch);
+    up({ settings: next });
   }
 
-  function selectMCQOption(idx) {
-    const { mcqStep, mcqAnswers, user } = state;
-    const updated = { ...mcqAnswers, [mcqStep]:idx };
-    if (mcqStep === MCQ_QUESTIONS.length - 1) {
-      const p = MCQ_QUESTIONS[1].opts[updated[1]] || 'Salaried employee';
-      up({ mcqAnswers:updated, persona:p });
-      if (user) {
-        supabase.from('profiles').update({
-          mcq_answers: updated,
-          persona: PERSONA_LABEL_TO_DB[p] || 'salaried_employee',
-          onboarding_status: 'chat_in_progress',
-        }).eq('id', user.id);
-      }
-      setTimeout(() => startChat(p), 350);
-    } else {
-      up({ mcqAnswers:updated, mcqStep:mcqStep + 1 });
-      if (user) {
-        supabase.from('profiles').update({
-          mcq_answers: updated,
-          onboarding_status: 'mcq_in_progress',
-        }).eq('id', user.id);
-      }
+  function setSidebarWidth(w) {
+    updateSettings({ sidebarWidth: w });
+  }
+
+  function setAiPanelWidth(w) {
+    updateSettings({ aiPanelWidth: w });
+  }
+
+  function submitOnboardingStep(step) {
+    up({ onboardingStep: step });
+    const { user, questionnaire } = stateRef.current;
+    if (user) {
+      supabase.from('profiles').update({
+        mcq_answers: questionnaire,
+        onboarding_status: 'mcq_in_progress',
+      }).eq('id', user.id);
     }
   }
 
-  function sendChatMessage() {
-    const { chatInputVal, chatMessages, chatQuestionIndex, persona, user } = state;
-    if (!chatInputVal.trim()) return;
-    const scripts = PERSONA_SCRIPTS[persona] || PERSONA_SCRIPTS['Salaried employee'];
-    const msgs = [...chatMessages, { role:'user', text:chatInputVal }];
-    up({ chatMessages:msgs, chatInputVal:'', chatTyping:true });
-    const next = chatQuestionIndex + 1;
-    if (next >= scripts.length) {
-      setTimeout(() => {
-        const final = [...msgs, { role:'ai', text:"Perfect! I have a clear picture of your finances. Setting up your personalized dashboard now..." }];
-        up({ chatMessages:final, chatTyping:false, chatQuestionIndex:next });
-        setTimeout(() => {
-          if (user) {
-            supabase.from('profiles').update({ onboarding_status: 'complete' }).eq('id', user.id);
-          }
-          up({ page:'app', activeNav:'dashboard', aiMessages:[{ role:'ai', text:`Welcome! Your ${persona} profile is live. Ask me anything about your finances, or just tell me about a transaction.` }] });
-        }, 1600);
-      }, 1100);
-    } else {
-      setTimeout(() => {
-        up({ chatMessages:[...msgs, { role:'ai', text:scripts[next] }], chatTyping:false, chatQuestionIndex:next });
-      }, 1100);
+  async function finishQuestionnaire() {
+    const { user, questionnaire } = stateRef.current;
+    const personaLabel = questionnaire.persona || stateRef.current.persona;
+    const personaDb = PERSONA_LABEL_TO_DB[personaLabel] || 'salaried_employee';
+    up({
+      persona: personaLabel,
+      page: 'app',
+      activeNav: 'dashboard',
+      aiMessages: loadCopilotFromSession(personaLabel, stateRef.current.fullName),
+    });
+    saveCopilotToSession(loadCopilotFromSession(personaLabel, stateRef.current.fullName));
+    if (user) {
+      await completeOnboarding(user.id, personaLabel);
+      await supabase.from('profiles').update({
+        mcq_answers: questionnaire,
+        persona: personaDb,
+        onboarding_status: 'complete',
+      }).eq('id', user.id);
     }
+    await refreshAppData();
   }
 
-  function sendAIMessage(text) {
-    const txt = text || state.aiInputVal;
-    if (!txt || !txt.trim()) return;
-    const msgs = [...state.aiMessages, { role:'user', text:txt }];
-    up({ aiMessages:msgs, aiInputVal:'', aiTyping:true });
-    const reply = getAIReply(txt);
-    setTimeout(() => up({ aiMessages:[...msgs, { role:'ai', text:reply }], aiTyping:false }), 900 + Math.random() * 400);
+  async function finishOnboarding(persona, answers) {
+    finishQuestionnaire();
+  }
+
+  async function sendAIMessage(text) {
+    const txt = text || stateRef.current.aiInputVal;
+    if (!txt?.trim()) return;
+    if (stateRef.current.isDemoMode) {
+      const msgs = [...stateRef.current.aiMessages, { role:'user', text: txt }];
+      up({ aiMessages: msgs, aiInputVal: '', aiTyping: true });
+      await new Promise(r => setTimeout(r, 450));
+      const { reply, createdTx, tx } = getLocalCopilotResponse(txt, stateRef.current.snapshot);
+      const patch = { aiMessages: [...msgs, { role:'ai', text: reply }], aiTyping: false };
+      saveCopilotToSession(patch.aiMessages);
+      if (createdTx && tx) {
+        await recordTransaction({
+          isDemoMode: true,
+          state: stateRef.current,
+          up,
+          payload: {
+            name: tx.name,
+            amount: tx.amount,
+            category: tx.category,
+            emoji: tx.emoji,
+            isRecurring: tx.isRecurring,
+            source: 'chat',
+          },
+        });
+        const msgs2 = [...msgs, { role: 'ai', text: reply }];
+        up({ aiMessages: msgs2, aiTyping: false });
+        saveCopilotToSession(msgs2);
+        return;
+      }
+      up(patch);
+      return;
+    }
+    const msgs = [...stateRef.current.aiMessages, { role:'user', text: txt }];
+    up({ aiMessages: msgs, aiInputVal: '', aiTyping: true });
+    try {
+      const { reply, snapshot, createdTx } = await sendCopilotMessage(txt, stateRef.current.snapshot);
+      up({ aiMessages: [...msgs, { role:'ai', text: reply }], aiTyping: false, snapshot: snapshot || stateRef.current.snapshot });
+      saveCopilotToSession([...msgs, { role:'ai', text: reply }]);
+      if (createdTx) await refreshAppData();
+    } catch (err) {
+      up({ aiMessages: [...msgs, { role:'ai', text: 'Sorry, something went wrong. Try again.' }], aiTyping: false });
+      saveCopilotToSession([...msgs, { role:'ai', text: 'Sorry, something went wrong. Try again.' }]);
+    }
   }
 
   async function tryDemo() {
-    if (state.user) {
+    if (stateRef.current.user) {
       signingOutRef.current = true;
-      try {
-        await signOut();
-      } catch { /* continue into demo */ }
+      try { await signOut(); } catch { /* ok */ }
       signingOutRef.current = false;
     }
     demoModeRef.current = true;
-    up({ ...demoAppState(), budgets: INITIAL_BUDGETS });
+    clearDemoSession();
+    const demo = demoAppState();
+    up({ ...demo, budgets: [], transactions: [], snapshot: null });
+    up({ page: 'app' });
+    setTimeout(() => refreshAppData(), 0);
   }
 
   async function submitAuth(e) {
     e.preventDefault();
-    const { authMode, authEmail, authPassword, authName } = state;
+    const { authMode, authEmail, authPassword, authName } = stateRef.current;
     demoModeRef.current = false;
     up({ authLoading: true, authError: '' });
     try {
       if (authMode === 'signup') {
         const data = await signUpWithEmail({ email: authEmail, password: authPassword, fullName: authName });
         if (!data.session) {
-          up({
-            authLoading: false,
-            authError: 'Account created! Check your email to confirm, then sign in.',
-          });
+          up({ authLoading: false, authError: 'Account created! Check your email to confirm, then sign in.' });
           return;
         }
       } else {
         await signInWithEmail({ email: authEmail, password: authPassword });
       }
-      // onAuthStateChange handles routing
     } catch (err) {
-      up({ authError: err.message || 'Authentication failed', authLoading: false });
+      up({ authError: formatAuthError(err), authLoading: false });
     }
   }
 
   async function handleSignOut() {
-    if (state.isDemoMode) {
+    if (stateRef.current.isDemoMode) {
       demoModeRef.current = false;
-      up({ ...emptyAuthState('landing'), budgets: INITIAL_BUDGETS });
+      clearDemoSession();
+      up({ ...emptyAuthState('landing'), transactions: [], budgets: [], snapshot: null });
       return;
     }
     signingOutRef.current = true;
     demoModeRef.current = false;
-    try {
-      await signOut();
-    } catch (err) {
-      console.error('Sign out error:', err);
-    } finally {
-      signingOutRef.current = false;
-    }
-    setState(s => ({
-      ...s,
-      ...emptyAuthState('landing'),
-      authInitializing: false,
-      budgets: INITIAL_BUDGETS,
-    }));
+    try { await signOut(); } catch (err) { console.error(err); }
+    finally { signingOutRef.current = false; }
+    setState(s => ({ ...s, ...emptyAuthState('landing'), authInitializing: false, transactions: [], budgets: [], snapshot: null }));
   }
 
-  const value = { state, up, goTo, startChat, selectMCQOption, sendChatMessage, sendAIMessage, tryDemo, submitAuth, handleSignOut };
+  async function addTransaction(payload) {
+    return recordTransaction({
+      isDemoMode: stateRef.current.isDemoMode,
+      state: stateRef.current,
+      up,
+      refreshAppData,
+      payload,
+    });
+  }
+
+  async function removeTransaction(id) {
+    const tx = stateRef.current.transactions.find(t => t.id === id);
+    await undoTransaction({
+      isDemoMode: stateRef.current.isDemoMode,
+      state: stateRef.current,
+      up,
+      refreshAppData,
+      tx,
+    });
+  }
+
+  const value = {
+    state, up, goTo, submitOnboardingStep, finishQuestionnaire, sendAIMessage,
+    tryDemo, submitAuth, handleSignOut, refreshAppData, addTransaction, removeTransaction,
+    updateSettings, setSidebarWidth, setAiPanelWidth,
+    getTxGroups: (search) => groupTransactions(stateRef.current.transactions, search),
+  };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

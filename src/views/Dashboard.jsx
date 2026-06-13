@@ -1,165 +1,237 @@
 import { useMemo } from 'react';
-import { buildForecast, buildGauge } from '../context';
-import { HoverEl } from '../utils';
+import { useApp } from '../context';
+import { gaugeFromScore, forecastPathsFromPoints, formatRupee, currentMonthLabel } from '../lib/format';
+import { buildBriefing, dashboardSubtitle } from '../lib/briefing';
+import { categoryMeta } from '../lib/categories';
+import { sortTransactionsDesc } from '../lib/snapshot';
+import { userTransactionsOnly } from '../lib/format';
+import AnimatedNumber from '../components/ui/AnimatedNumber';
+import Icon from '../components/ui/Icon';
+import CategoryIcon from '../components/ui/CategoryIcon';
+import EmptyState from '../components/ui/EmptyState';
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function StatCard({ label, value, format, sub, accent, delay, icon }) {
+  return (
+    <div className={`fs-card fs-card-padded fs-stat-card fs-card-hover fs-animate-in fs-animate-in-delay-${delay}`}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="fs-label">{label}</div>
+        {icon && <span style={{ color: 'var(--fs-text-muted)' }}><Icon name={icon} size={17} /></span>}
+      </div>
+      <div className="fs-stat-value" style={{ color: accent || 'var(--fs-text)' }}>
+        {typeof value === 'number' ? <AnimatedNumber value={value} format={format} /> : value}
+      </div>
+      {sub && <div className="fs-subtitle" style={{ marginTop: 6, fontSize: '0.8125rem' }}>{sub}</div>}
+    </div>
+  );
+}
+
+function HealthRing({ score }) {
+  const g = gaugeFromScore(score);
+  return (
+    <div style={{ position: 'relative', width: 128, height: 128, flexShrink: 0 }}>
+      <svg width="128" height="128" viewBox="0 0 120 120">
+        <circle className="fs-ring-track" cx="60" cy="60" r="46" fill="none" strokeWidth="10" />
+        <circle
+          className="fs-ring-fill"
+          cx="60" cy="60" r="46" fill="none" strokeWidth="10" strokeLinecap="round"
+          stroke={g.color}
+          strokeDasharray={g.circumference}
+          strokeDashoffset={g.dashOffset}
+          transform={g.transform}
+        />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontFamily: "'Sora', sans-serif", fontSize: '1.85rem', fontWeight: 700, color: g.color, lineHeight: 1 }}>
+          <AnimatedNumber value={g.score} format={(n) => Math.round(n)} />
+        </div>
+        <div className="fs-label" style={{ marginTop: 3 }}>Health</div>
+      </div>
+    </div>
+  );
+}
+
+const DNA_COLORS = ['var(--fs-info)', 'var(--fs-success)', 'var(--fs-warning)', 'var(--fs-brand)', '#8B5CF6', '#EC4899'];
 
 export default function Dashboard() {
-  const forecast = useMemo(() => buildForecast(), []);
-  const gauge = useMemo(() => buildGauge(), []);
+  const { state, up } = useApp();
+  const { snapshot, fullName, dataLoading, transactions, questionnaire } = state;
+  const snap = snapshot || {};
+  const forecast = useMemo(() => forecastPathsFromPoints(snap.forecast?.points), [snap.forecast]);
+  const categoryDna = useMemo(() => (snap.donut_segments || []).slice(0, 6), [snap.donut_segments]);
+  const leaks = snap.leaks || [];
+  const briefing = useMemo(() => buildBriefing(snap, questionnaire || {}), [snap, questionnaire]);
+  const firstName = (fullName || 'there').split(' ')[0];
+  const recent = useMemo(
+    () => sortTransactionsDesc(userTransactionsOnly(transactions)),
+    [transactions],
+  );
+
+  if (dataLoading && !snapshot) {
+    return (
+      <div className="fs-content-inner">
+        <div className="fs-skeleton" style={{ height: 116, borderRadius: 14, marginBottom: 18 }} />
+        <div className="fs-stat-grid-3" style={{ marginBottom: 16 }}>
+          {[1, 2, 3].map(i => <div key={i} className="fs-skeleton" style={{ height: 108, borderRadius: 14 }} />)}
+        </div>
+        <div className="fs-grid-2">
+          {[1, 2].map(i => <div key={i} className="fs-skeleton" style={{ height: 220, borderRadius: 14 }} />)}
+        </div>
+      </div>
+    );
+  }
+
+  const empty = !snap.monthly_spend && !userTransactionsOnly(transactions).length;
 
   return (
-    <>
-      {/* Greeting */}
-      <div style={{ marginBottom:22 }}>
-        <h2 style={{ fontSize:22, fontWeight:700, letterSpacing:'-0.4px', marginBottom:3 }}>Good morning, Arjun</h2>
-        <p style={{ fontSize:14, color:'#6E6E73' }}>June 13, 2025 · Here is your financial snapshot</p>
-      </div>
-
-      {/* Briefing */}
-      <div style={{ background:'white', borderRadius:14, padding:'18px 22px', marginBottom:18, border:'1px solid #E8E8E2', borderLeft:'4px solid #E8570A', boxShadow:'0 1px 3px rgba(0,0,0,0.04)', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16 }}>
-        <div style={{ flex:1 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:8 }}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1L8 5.2H12.7L9.1 7.5L10.5 11.8L6.5 9.4L2.5 11.8L3.9 7.5L.3 5.2H5Z" fill="#E8570A" /></svg>
-            <span style={{ fontSize:11, fontWeight:700, color:'#E8570A', letterSpacing:'0.8px' }}>JUNE BRIEFING</span>
-          </div>
-          <p style={{ fontSize:15, color:'#1A1A1A', lineHeight:1.65 }}>
-            You are on track to save <strong>₹18,664</strong> this month — 28.7% of take-home. Housing is your biggest spend at 52%. I spotted <span style={{ color:'#E8570A', fontWeight:600 }}>2 spending leaks</span> worth reviewing.
+    <div className="fs-content-inner fs-view-enter">
+      <div className="fs-card fs-card-padded fs-animate-in" style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <h2 className="fs-h1" style={{ marginBottom: 6 }}>{greeting()}, {firstName}</h2>
+          <p className="fs-subtitle" style={{ marginBottom: 16 }}>{currentMonthLabel()} · {dashboardSubtitle(questionnaire || {})}</p>
+          <p style={{ fontSize: '0.9375rem', lineHeight: 1.65, margin: 0, color: snap.net_savings < 0 ? 'var(--fs-danger)' : 'var(--fs-text-secondary)' }}>
+            {briefing}
           </p>
         </div>
-        <HoverEl
-          as="button"
-          style={{ background:'white', border:'1.5px solid #E8E8E2', padding:'7px 14px', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit', flexShrink:0 }}
-          hoverStyle={{ background:'#F5F5F3' }}
-        >View analysis</HoverEl>
+        <HealthRing score={snap.health_score || 0} />
       </div>
 
-      {/* 3 stat cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:18 }}>
-        {/* Financial Health */}
-        <div style={{ background:'white', borderRadius:14, padding:20, border:'1px solid #E8E8E2', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#9B9B9F', letterSpacing:'0.8px', marginBottom:14 }}>FINANCIAL HEALTH</div>
-          <div style={{ display:'flex', alignItems:'center', gap:16 }}>
-            <svg width="76" height="76" viewBox="0 0 120 120" style={{ flexShrink:0 }}>
-              <circle cx="60" cy="60" r="46" fill="none" stroke="#F0F0EC" strokeWidth="9" />
-              <circle cx="60" cy="60" r="46" fill="none" stroke={gauge.color} strokeWidth="9"
-                strokeDasharray={gauge.circumference} strokeDashoffset={gauge.dashOffset}
-                strokeLinecap="round" transform={gauge.transform} />
-              <text x="60" y="55" textAnchor="middle" fill="#1A1A1A" fontSize="22" fontWeight="700">{gauge.score}</text>
-              <text x="60" y="71" textAnchor="middle" fill="#9B9B9F" fontSize="10">/ 100</text>
-            </svg>
-            <div>
-              <div style={{ fontSize:13, fontWeight:600, color:'#1A8A4A', marginBottom:5 }}>Good standing</div>
-              <div style={{ fontSize:12, color:'#9B9B9F', lineHeight:1.55 }}>Low debt · Stable income · Build emergency fund</div>
+      <div className="fs-stat-grid-3" style={{ marginBottom: 18 }}>
+        <StatCard
+          label="Monthly spend" icon="wallet"
+          value={snap.monthly_spend || 0}
+          format={(n) => formatRupee(n)}
+          sub={`${snap.budget_used_pct || 0}% of ${formatRupee(snap.total_budget_limit || 0)} budget`}
+          delay={1}
+        />
+        <StatCard
+          label="Net savings" icon="savings"
+          value={snap.net_savings || 0}
+          format={(n) => formatRupee(n)}
+          sub={`from ${formatRupee(snap.monthly_income || 0)} income`}
+          accent="var(--fs-success)"
+          delay={2}
+        />
+        <StatCard
+          label="Savings rate" icon="trendUp"
+          value={snap.savings_rate_pct || 0}
+          format={(n) => `${(Math.round(n * 10) / 10)}%`}
+          sub={snap.health_label || 'Getting started'}
+          delay={3}
+        />
+      </div>
+
+      <div className="fs-grid-2 fs-animate-in fs-animate-in-delay-2" style={{ marginBottom: 18 }}>
+        <div className="fs-card fs-card-padded">
+          <div className="fs-label" style={{ marginBottom: 20 }}>Spending breakdown</div>
+          {categoryDna.length === 0 ? (
+            <p className="fs-subtitle">Log expenses to see where your money goes.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {categoryDna.map((seg, i) => {
+                const color = seg.color || categoryMeta(seg.name).color || DNA_COLORS[i % DNA_COLORS.length];
+                return (
+                  <div key={seg.name}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{seg.name}</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 700, color }}>{seg.pct || 0}%</span>
+                    </div>
+                    <div className="fs-progress-track">
+                      <div className="fs-progress-fill fs-progress-fill-animated" style={{ width: `${seg.pct || 0}%`, background: color }} />
+                    </div>
+                    <div className="fs-subtitle" style={{ marginTop: 5, fontSize: '0.72rem' }}>{formatRupee(seg.amount || 0)} this month</div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Monthly Spend */}
-        <div style={{ background:'white', borderRadius:14, padding:20, border:'1px solid #E8E8E2', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#9B9B9F', letterSpacing:'0.8px', marginBottom:12 }}>MONTHLY SPEND</div>
-          <div style={{ fontSize:28, fontWeight:700, letterSpacing:'-0.8px', marginBottom:6 }}>₹46,336</div>
-          <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:12 }}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 9L6.5 4.5L11 9" stroke="#D63B2F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <span style={{ fontSize:13, color:'#D63B2F', fontWeight:500 }}>+8.2% vs last month</span>
+        <div className="fs-card fs-card-padded">
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div className="fs-label">Savings forecast</div>
+            <span className="fs-badge fs-badge-success"><span className="fs-badge-dot" />Live</span>
           </div>
-          <div style={{ fontSize:12, color:'#9B9B9F', marginBottom:6 }}>Budget: ₹52,000 · 89% used</div>
-          <div style={{ height:4, background:'#F0F0EC', borderRadius:2, overflow:'hidden' }}>
-            <div style={{ height:'100%', width:'89%', background:'linear-gradient(90deg,#0EA5E9,#E8570A)', borderRadius:2 }} />
+          <div style={{ fontFamily: "'Sora', sans-serif", fontSize: '1.65rem', fontWeight: 700, marginBottom: 18, letterSpacing: '-0.025em' }}>
+            <AnimatedNumber value={snap.forecast?.projected_savings || snap.net_savings || 0} format={(n) => formatRupee(n)} />{' '}
+            <span style={{ fontSize: '0.8125rem', fontFamily: "'DM Sans', sans-serif", fontWeight: 500, color: 'var(--fs-text-secondary)' }}>projected</span>
           </div>
-        </div>
-
-        {/* Savings Rate */}
-        <div style={{ background:'white', borderRadius:14, padding:20, border:'1px solid #E8E8E2', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#9B9B9F', letterSpacing:'0.8px', marginBottom:12 }}>SAVINGS RATE</div>
-          <div style={{ fontSize:28, fontWeight:700, color:'#1A8A4A', letterSpacing:'-0.8px', marginBottom:6 }}>28.7%</div>
-          <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:12 }}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 4L6.5 8.5L11 4" stroke="#1A8A4A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <span style={{ fontSize:13, color:'#1A8A4A', fontWeight:500 }}>+2.1% vs last month</span>
-          </div>
-          <div style={{ fontSize:12, color:'#9B9B9F' }}>₹18,664 saved so far</div>
+          <svg viewBox="0 0 560 120" style={{ width: '100%', height: 120 }} preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="fgr" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--fs-brand)" stopOpacity="0.16" />
+                <stop offset="100%" stopColor="var(--fs-brand)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={forecast.area} fill="url(#fgr)" style={{ animation: 'fs-fade-in 1.2s ease 0.3s both' }} />
+            <path
+              d={forecast.line} fill="none" stroke="var(--fs-brand)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+              style={{ strokeDasharray: 1600, strokeDashoffset: 1600, animation: 'fs-draw 1.6s var(--fs-ease) 0.2s forwards' }}
+            />
+          </svg>
         </div>
       </div>
 
-      {/* Spending DNA + Forecast */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1.7fr', gap:16, marginBottom:18 }}>
-        {/* Spending DNA */}
-        <div style={{ background:'white', borderRadius:14, padding:20, border:'1px solid #E8E8E2', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#9B9B9F', letterSpacing:'0.8px', marginBottom:18 }}>SPENDING DNA</div>
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {[
-              { label:'Routine', pct:55, color:'#0EA5E9', sub:'EMI, utilities, groceries' },
-              { label:'Flexible', pct:30, color:'#1A8A4A', sub:'Food delivery, transport, health' },
-              { label:'Impulse', pct:15, color:'#E8570A', sub:'Shopping, leisure, dining out' },
-            ].map(({ label, pct, color, sub }) => (
-              <div key={label}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
-                  <span style={{ fontSize:13, fontWeight:500 }}>{label}</span>
-                  <span style={{ fontSize:13, fontWeight:700, color }}>{pct}%</span>
+      {leaks.length > 0 && (
+        <div className="fs-card fs-card-padded fs-animate-in fs-animate-in-delay-3" style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>
+            <div className="fs-label">Leak detector</div>
+            <span className="fs-badge fs-badge-brand">{leaks.length} found</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {leaks.map((leak, i) => (
+              <div key={i} className="fs-animate-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--fs-surface-2)', borderRadius: 12, border: '1px solid var(--fs-border)', animationDelay: `${0.1 + i * 0.06}s` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--fs-brand-soft)', color: 'var(--fs-brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon name="alert" size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{leak.title}</div>
+                    <div className="fs-subtitle" style={{ fontSize: '0.75rem' }}>{leak.detail}</div>
+                  </div>
                 </div>
-                <div style={{ height:7, background:'#F0F0EC', borderRadius:4, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:pct + '%', background:color, borderRadius:4 }} />
-                </div>
-                <div style={{ fontSize:11, color:'#9B9B9F', marginTop:4 }}>{sub}</div>
+                {leak.delta ? <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--fs-brand)' }}>+{formatRupee(leak.delta)}</span> : null}
               </div>
             ))}
           </div>
         </div>
+      )}
 
-        {/* Savings Forecast */}
-        <div style={{ background:'white', borderRadius:14, padding:20, border:'1px solid #E8E8E2', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#9B9B9F', letterSpacing:'0.8px' }}>SAVINGS FORECAST</div>
-            <span style={{ fontSize:12, color:'#6E6E73' }}>June 2025</span>
+      {recent.length > 0 && (
+        <div className="fs-card fs-animate-in fs-animate-in-delay-4" style={{ overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--fs-border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="fs-h3">Recent activity</div>
+            <button className="fs-btn fs-btn-ghost fs-btn-sm" onClick={() => up({ activeNav: 'transactions' })} style={{ gap: 5 }}>
+              View all <Icon name="chevronRight" size={14} />
+            </button>
           </div>
-          <div style={{ fontSize:22, fontWeight:700, letterSpacing:'-0.5px', marginBottom:16 }}>
-            ₹18,664 <span style={{ fontSize:13, fontWeight:500, color:'#1A8A4A' }}>projected</span>
-          </div>
-          <svg viewBox="0 0 560 110" style={{ width:'100%', height:110 }} preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="fgr" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0EA5E9" stopOpacity="0.15" />
-                <stop offset="100%" stopColor="#0EA5E9" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d={forecast.area} fill="url(#fgr)" />
-            <path d={forecast.line} fill="none" stroke="#0EA5E9" strokeWidth="2.2" />
-          </svg>
-          <div style={{ display:'flex', justifyContent:'space-between', marginTop:6 }}>
-            <span style={{ fontSize:11, color:'#9B9B9F' }}>Jun 1</span>
-            <span style={{ fontSize:11, color:'#9B9B9F' }}>Today · Jun 13</span>
-            <span style={{ fontSize:11, color:'#9B9B9F' }}>Jun 30</span>
-          </div>
+          {recent.map(tx => (
+            <div key={tx.id} className="fs-tx-row">
+              <CategoryIcon category={tx.category} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>{tx.name}</div>
+                <div className="fs-subtitle" style={{ fontSize: '0.75rem' }}>{tx.category}</div>
+              </div>
+              <div className="fs-money" style={{ fontSize: '0.875rem', fontWeight: 600, color: tx.amountColor }}>{tx.amountStr}</div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      {/* Leak Detector */}
-      <div style={{ background:'white', borderRadius:14, padding:20, border:'1px solid #E8E8E2', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#9B9B9F', letterSpacing:'0.8px' }}>LEAK DETECTOR</div>
-          <span style={{ background:'#FFF2EC', color:'#E8570A', fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20 }}>2 found</span>
-        </div>
-        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', background:'#FFFAF7', borderRadius:10, border:'1px solid #FAD4C2' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <span style={{ fontSize:20 }}>🍕</span>
-              <div>
-                <div style={{ fontSize:14, fontWeight:600 }}>Food delivery up 40%</div>
-                <div style={{ fontSize:12, color:'#9B9B9F' }}>Swiggy + Zomato · ₹1,110 this month vs ₹790 avg</div>
-              </div>
-            </div>
-            <span style={{ fontSize:13, fontWeight:700, color:'#E8570A' }}>+₹320</span>
-          </div>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', background:'#FFFAF7', borderRadius:10, border:'1px solid #FAD4C2' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <span style={{ fontSize:20 }}>🛍</span>
-              <div>
-                <div style={{ fontSize:14, fontWeight:600 }}>Shopping spike</div>
-                <div style={{ fontSize:12, color:'#9B9B9F' }}>Amazon + Myntra · ₹5,698 this month vs ₹2,100 avg</div>
-              </div>
-            </div>
-            <span style={{ fontSize:13, fontWeight:700, color:'#E8570A' }}>+₹3,598</span>
-          </div>
-        </div>
-      </div>
-    </>
+      {empty && (
+        <EmptyState
+          icon="sparkle"
+          title="Your dashboard is ready"
+          description="Log your first transaction manually, upload a CSV during onboarding, or tell the AI Copilot something like “I spent ₹500 on groceries”."
+          action={<button className="fs-btn fs-btn-primary" onClick={() => up({ showAI: true })}>Open AI Copilot</button>}
+        />
+      )}
+    </div>
   );
 }

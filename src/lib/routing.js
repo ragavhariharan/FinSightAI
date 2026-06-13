@@ -5,20 +5,11 @@ export const PUBLIC_PAGES = ['landing', 'auth'];
 
 /** Map DB onboarding_status → app page */
 export function pageFromOnboardingStatus(status) {
-  switch (status) {
-    case 'complete':
-      return 'app';
-    case 'chat_in_progress':
-    case 'chat_complete':
-    case 'mcq_complete':
-    case 'data_choice_pending':
-    case 'upload_complete':
-      return 'onboarding-chat';
-    case 'not_started':
-    case 'mcq_in_progress':
-    default:
-      return 'onboarding-mcq';
+  if (status === 'complete') return 'app';
+  if (['chat_in_progress', 'chat_complete', 'mcq_complete', 'data_choice_pending', 'upload_complete'].includes(status)) {
+    return 'app';
   }
+  return 'onboarding';
 }
 
 /** Reset all user-specific state when logged out */
@@ -29,13 +20,9 @@ export function emptyAuthState(page = 'landing') {
     isDemoMode: false,
     fullName: '',
     avatarInitials: 'U',
-    mcqStep: 0,
-    mcqAnswers: {},
+    onboardingStep: 0,
+    questionnaire: {},
     persona: 'Salaried employee',
-    chatMessages: [],
-    chatInputVal: '',
-    chatTyping: false,
-    chatQuestionIndex: 0,
     aiMessages: [],
     aiInputVal: '',
     aiTyping: false,
@@ -51,35 +38,29 @@ export function buildAppStateFromProfile(profile) {
     : 'Salaried employee';
 
   const page = pageFromOnboardingStatus(profile.onboarding_status);
-  const mcqAnswers = profile.mcq_answers || {};
-  const answered = Object.keys(mcqAnswers).length;
+  const questionnaire = profile.mcq_answers?.persona ? profile.mcq_answers : (profile.mcq_answers || {});
 
   return {
     page,
     persona,
-    mcqAnswers,
-    mcqStep: page === 'onboarding-mcq' ? Math.min(answered, 4) : answered,
+    questionnaire,
+    onboardingStep: page === 'onboarding' ? 0 : 0,
+    mcqAnswers: questionnaire,
     fullName: profile.full_name || 'User',
     avatarInitials: profile.avatar_initials || 'U',
     activeNav: 'dashboard',
     isDemoMode: false,
-    aiMessages: page === 'app'
-      ? [{ role: 'ai', text: `Welcome${profile.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}! Ask me anything about your finances, or log a transaction.` }]
-      : [],
-    chatMessages: [],
-    chatQuestionIndex: 0,
+    aiMessages: [],
   };
 }
 
 /** Default state for authenticated user still setting up profile */
 export function newUserOnboardingState() {
   return {
-    page: 'onboarding-mcq',
-    mcqStep: 0,
-    mcqAnswers: {},
+    page: 'onboarding',
+    onboardingStep: 0,
+    questionnaire: {},
     isDemoMode: false,
-    chatMessages: [],
-    chatQuestionIndex: 0,
     aiMessages: [],
   };
 }
