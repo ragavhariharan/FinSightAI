@@ -7,7 +7,13 @@ if (!url || !anonKey) {
   console.warn('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY — copy .env.example to .env.local');
 }
 
-export const supabase = createClient(url || '', anonKey || '');
+export const supabase = createClient(url || '', anonKey || '', {
+  auth: {
+    detectSessionInUrl: true,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
 
 /** Map MCQ UI label → DB persona_type enum */
 export const PERSONA_LABEL_TO_DB = {

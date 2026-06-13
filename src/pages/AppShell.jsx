@@ -69,8 +69,8 @@ function ViewContent({ nav }) {
 }
 
 export default function AppShell() {
-  const { state, up } = useApp();
-  const { activeNav, showAI, persona } = state;
+  const { state, up, handleSignOut } = useApp();
+  const { activeNav, showAI, persona, fullName, avatarInitials, isDemoMode } = state;
   const pageTitle = PAGE_TITLES[activeNav] || 'Dashboard';
   const isTransactionsView = activeNav === 'transactions';
 
@@ -120,11 +120,18 @@ export default function AppShell() {
             <span style={{ fontSize:13, fontWeight:500 }}>Help &amp; Support</span>
           </HoverEl>
           <div style={{ padding:'11px 14px', display:'flex', alignItems:'center', gap:9 }}>
-            <div style={{ width:30, height:30, borderRadius:'50%', background:'#E8570A', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:11, fontWeight:700, flexShrink:0 }}>AK</div>
+            <div style={{ width:30, height:30, borderRadius:'50%', background:'#E8570A', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:11, fontWeight:700, flexShrink:0 }}>{avatarInitials || 'U'}</div>
             <div style={{ minWidth:0, flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>Arjun Kumar</div>
+              <div style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{fullName || 'User'}</div>
               <div style={{ fontSize:11, color:'#9B9B9F' }}>{persona}</div>
             </div>
+            <HoverEl
+              as="button"
+              onClick={handleSignOut}
+              title={isDemoMode ? 'Exit demo' : 'Sign out'}
+              style={{ background:'none', border:'none', cursor:'pointer', color:'#9B9B9F', padding:4, fontFamily:'inherit', fontSize:11, fontWeight:600 }}
+              hoverStyle={{ color:'#D63B2F' }}
+            >{isDemoMode ? 'Exit' : 'Out'}</HoverEl>
           </div>
         </div>
       </aside>

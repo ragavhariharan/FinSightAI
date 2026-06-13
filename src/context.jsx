@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, useCallback } from 'react';
-import { signUpWithEmail, signInWithEmail } from './lib/auth';
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import { signUpWithEmail, signInWithEmail, signOut, resolveSessionState } from './lib/auth';
+import { supabase, PERSONA_LABEL_TO_DB } from './lib/supabase';
+import { PUBLIC_PAGES, demoAppState, emptyAuthState } from './lib/routing';
 
 export const TRANSACTIONS = [
   { id:1,  date:'Jun 13, 2025', name:'Swiggy',               category:'Food & Dining', emoji:'🍔', account:'HDFC Savings', amount:-480   },
@@ -170,6 +172,10 @@ const AppContext = createContext({});
 export function AppProvider({ children }) {
   const [state, setState] = useState({
     page:'landing',
+    authInitializing:true,
+    user:null,
+    fullName:'',
+    avatarInitials:'U',
     authMode:'signup',
     authEmail:'', authPassword:'', authName:'',
     mcqStep:0, mcqAnswers:{}, persona:'Salaried employee',
@@ -180,11 +186,80 @@ export function AppProvider({ children }) {
     budgets:INITIAL_BUDGETS,
     authLoading:false,
     authError:'',
+    isDemoMode:false,
   });
 
   const up = useCallback((patch) => setState(s => ({ ...s, ...patch })), []);
+  const signingOutRef = useRef(false);
+  const demoModeRef = useRef(false);
 
-  function goTo(page, extra) { up({ page, ...(extra || {}) }); }
+  // Session listener — single source of truth for auth routing
+  useEffect(() => {
+    let mounted = true;
+
+    async function applySession(session, event) {
+      if (!mounted) return;
+
+      if (window.location.hash.includes('access_token')) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+
+      // During sign-out, ignore stale session events
+      if (signingOutRef.current && session) return;
+
+      // Demo mode — no real session, keep demo dashboard
+      if (!session && demoModeRef.current) {
+        setState(s => ({ ...s, authInitializing: false }));
+        return;
+      }
+
+      if (!session) {
+        demoModeRef.current = false;
+        setState(s => ({
+          ...s,
+          ...emptyAuthState('landing'),
+          authInitializing: false,
+          budgets: INITIAL_BUDGETS,
+        }));
+        return;
+      }
+
+      // Real login clears demo mode
+      demoModeRef.current = false;
+
+      const route = await resolveSessionState(session);
+      if (!mounted || signingOutRef.current) return;
+
+      setState(s => ({
+        ...s,
+        ...route,
+        authInitializing: false,
+        authLoading: false,
+        budgets: INITIAL_BUDGETS,
+      }));
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      applySession(session, event);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  function goTo(page, extra = {}) {
+    setState(s => {
+      // Logged-in users cannot browse landing/auth without signing out
+      if (s.user && PUBLIC_PAGES.includes(page)) return s;
+      // Logged-out users cannot access app/onboarding without auth (except demo)
+      if (!s.user && !s.isDemoMode && !PUBLIC_PAGES.includes(page)) {
+        return { ...s, page: 'auth', authMode: 'signup', ...extra };
+      }
+      return { ...s, page, ...extra };
+    });
+  }
 
   function startChat(persona) {
     const scripts = PERSONA_SCRIPTS[persona] || PERSONA_SCRIPTS['Salaried employee'];
@@ -193,19 +268,32 @@ export function AppProvider({ children }) {
   }
 
   function selectMCQOption(idx) {
-    const { mcqStep, mcqAnswers } = state;
+    const { mcqStep, mcqAnswers, user } = state;
     const updated = { ...mcqAnswers, [mcqStep]:idx };
     if (mcqStep === MCQ_QUESTIONS.length - 1) {
       const p = MCQ_QUESTIONS[1].opts[updated[1]] || 'Salaried employee';
       up({ mcqAnswers:updated, persona:p });
+      if (user) {
+        supabase.from('profiles').update({
+          mcq_answers: updated,
+          persona: PERSONA_LABEL_TO_DB[p] || 'salaried_employee',
+          onboarding_status: 'chat_in_progress',
+        }).eq('id', user.id);
+      }
       setTimeout(() => startChat(p), 350);
     } else {
       up({ mcqAnswers:updated, mcqStep:mcqStep + 1 });
+      if (user) {
+        supabase.from('profiles').update({
+          mcq_answers: updated,
+          onboarding_status: 'mcq_in_progress',
+        }).eq('id', user.id);
+      }
     }
   }
 
   function sendChatMessage() {
-    const { chatInputVal, chatMessages, chatQuestionIndex, persona } = state;
+    const { chatInputVal, chatMessages, chatQuestionIndex, persona, user } = state;
     if (!chatInputVal.trim()) return;
     const scripts = PERSONA_SCRIPTS[persona] || PERSONA_SCRIPTS['Salaried employee'];
     const msgs = [...chatMessages, { role:'user', text:chatInputVal }];
@@ -216,6 +304,9 @@ export function AppProvider({ children }) {
         const final = [...msgs, { role:'ai', text:"Perfect! I have a clear picture of your finances. Setting up your personalized dashboard now..." }];
         up({ chatMessages:final, chatTyping:false, chatQuestionIndex:next });
         setTimeout(() => {
+          if (user) {
+            supabase.from('profiles').update({ onboarding_status: 'complete' }).eq('id', user.id);
+          }
           up({ page:'app', activeNav:'dashboard', aiMessages:[{ role:'ai', text:`Welcome! Your ${persona} profile is live. Ask me anything about your finances, or just tell me about a transaction.` }] });
         }, 1600);
       }, 1100);
@@ -235,32 +326,66 @@ export function AppProvider({ children }) {
     setTimeout(() => up({ aiMessages:[...msgs, { role:'ai', text:reply }], aiTyping:false }), 900 + Math.random() * 400);
   }
 
-  function tryDemo() {
-    up({
-      page:'app', activeNav:'dashboard', persona:'Salaried employee',
-      aiMessages:[{ role:'ai', text:"Welcome to FinSight demo! Your Salaried employee profile is loaded. Try asking 'what can I cut?' or type 'I spent ₹500 on groceries' to see the AI in action." }]
-    });
+  async function tryDemo() {
+    if (state.user) {
+      signingOutRef.current = true;
+      try {
+        await signOut();
+      } catch { /* continue into demo */ }
+      signingOutRef.current = false;
+    }
+    demoModeRef.current = true;
+    up({ ...demoAppState(), budgets: INITIAL_BUDGETS });
   }
 
   async function submitAuth(e) {
     e.preventDefault();
     const { authMode, authEmail, authPassword, authName } = state;
-    up({ authLoading:true, authError:'' });
+    demoModeRef.current = false;
+    up({ authLoading: true, authError: '' });
     try {
       if (authMode === 'signup') {
-        await signUpWithEmail({ email:authEmail, password:authPassword, fullName:authName });
+        const data = await signUpWithEmail({ email: authEmail, password: authPassword, fullName: authName });
+        if (!data.session) {
+          up({
+            authLoading: false,
+            authError: 'Account created! Check your email to confirm, then sign in.',
+          });
+          return;
+        }
       } else {
-        await signInWithEmail({ email:authEmail, password:authPassword });
+        await signInWithEmail({ email: authEmail, password: authPassword });
       }
-      goTo('onboarding-mcq', { mcqStep:0, mcqAnswers:{} });
+      // onAuthStateChange handles routing
     } catch (err) {
-      up({ authError: err.message || 'Authentication failed' });
-    } finally {
-      up({ authLoading:false });
+      up({ authError: err.message || 'Authentication failed', authLoading: false });
     }
   }
 
-  const value = { state, up, goTo, startChat, selectMCQOption, sendChatMessage, sendAIMessage, tryDemo, submitAuth };
+  async function handleSignOut() {
+    if (state.isDemoMode) {
+      demoModeRef.current = false;
+      up({ ...emptyAuthState('landing'), budgets: INITIAL_BUDGETS });
+      return;
+    }
+    signingOutRef.current = true;
+    demoModeRef.current = false;
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('Sign out error:', err);
+    } finally {
+      signingOutRef.current = false;
+    }
+    setState(s => ({
+      ...s,
+      ...emptyAuthState('landing'),
+      authInitializing: false,
+      budgets: INITIAL_BUDGETS,
+    }));
+  }
+
+  const value = { state, up, goTo, startChat, selectMCQOption, sendChatMessage, sendAIMessage, tryDemo, submitAuth, handleSignOut };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
