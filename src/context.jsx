@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react';
+import { signUpWithEmail, signInWithEmail } from './lib/auth';
 
 export const TRANSACTIONS = [
   { id:1,  date:'Jun 13, 2025', name:'Swiggy',               category:'Food & Dining', emoji:'🍔', account:'HDFC Savings', amount:-480   },
@@ -177,6 +178,8 @@ export function AppProvider({ children }) {
     aiMessages:[], aiInputVal:'', aiTyping:false,
     txSearch:'',
     budgets:INITIAL_BUDGETS,
+    authLoading:false,
+    authError:'',
   });
 
   const up = useCallback((patch) => setState(s => ({ ...s, ...patch })), []);
@@ -239,9 +242,22 @@ export function AppProvider({ children }) {
     });
   }
 
-  function submitAuth(e) {
+  async function submitAuth(e) {
     e.preventDefault();
-    goTo('onboarding-mcq', { mcqStep:0, mcqAnswers:{} });
+    const { authMode, authEmail, authPassword, authName } = state;
+    up({ authLoading:true, authError:'' });
+    try {
+      if (authMode === 'signup') {
+        await signUpWithEmail({ email:authEmail, password:authPassword, fullName:authName });
+      } else {
+        await signInWithEmail({ email:authEmail, password:authPassword });
+      }
+      goTo('onboarding-mcq', { mcqStep:0, mcqAnswers:{} });
+    } catch (err) {
+      up({ authError: err.message || 'Authentication failed' });
+    } finally {
+      up({ authLoading:false });
+    }
   }
 
   const value = { state, up, goTo, startChat, selectMCQOption, sendChatMessage, sendAIMessage, tryDemo, submitAuth };

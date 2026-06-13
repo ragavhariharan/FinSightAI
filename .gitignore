@@ -1,6 +1,27 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+
+# Environment — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+
+# OS
 .DS_Store
-*.local
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Supabase CLI local state
+supabase/.branches
+supabase/.temp
+
+# AI / local tooling
 .claude/
 CLAUDE.md
