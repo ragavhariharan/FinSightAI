@@ -2,6 +2,9 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef } f
 import { signUpWithEmail, signInWithEmail, signOut, resolveSessionState } from './lib/auth';
 import { supabase, PERSONA_LABEL_TO_DB } from './lib/supabase';
 import { PUBLIC_PAGES, demoAppState, emptyAuthState } from './lib/routing';
+import { fetchTransactions, insertTransaction } from './lib/api/transactions';
+import { fetchBudgetsWithSpent, insertBudget } from './lib/api/budgets';
+import { fetchSnapshot } from './lib/api/dashboard';
 
 export const TRANSACTIONS = [
   { id:1,  date:'Jun 13, 2025', name:'Swiggy',               category:'Food & Dining', emoji:'🍔', account:'HDFC Savings', amount:-480   },
@@ -143,24 +146,29 @@ export function getAIReply(q) {
   return "Based on your Salaried employee profile, you're tracking well this month. The biggest opportunity is cutting impulse shopping. Want a detailed breakdown of any category?";
 }
 
-export function getTxGroups(txSearch) {
-  const q = txSearch.toLowerCase();
+export function getTxGroups(transactions, txSearch) {
+  const q = (txSearch || '').toLowerCase();
+  const all = transactions || [];
   const filtered = q
-    ? TRANSACTIONS.filter(t => t.name.toLowerCase().includes(q) || t.category.toLowerCase().includes(q))
-    : TRANSACTIONS;
+    ? all.filter(t => t.name.toLowerCase().includes(q) || t.category.toLowerCase().includes(q))
+    : all;
   const map = {};
   filtered.forEach(t => {
-    if (!map[t.date]) map[t.date] = { date:t.date, items:[] };
-    map[t.date].items.push(t);
+    const raw = t.txn_date || t.date || '';
+    const displayDate = /^\d{4}-\d{2}-\d{2}/.test(raw)
+      ? new Date(raw + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+      : raw;
+    if (!map[displayDate]) map[displayDate] = { date:displayDate, items:[] };
+    map[displayDate].items.push(t);
   });
   return Object.values(map).map(g => {
-    const net = g.items.reduce((s, t) => s + t.amount, 0);
+    const net = g.items.reduce((s, t) => s + (Number(t.amount) || 0), 0);
     return {
       ...g,
       totalStr: (net > 0 ? '+' : '') + '₹' + Math.abs(net).toLocaleString('en-IN'),
       items: g.items.map(t => ({
         ...t,
-        amountStr: (t.amount > 0 ? '+' : '') + '₹' + Math.abs(t.amount).toLocaleString('en-IN'),
+        amountStr: (t.amount > 0 ? '+' : '') + '₹' + Math.abs(Number(t.amount)).toLocaleString('en-IN'),
         amountColor: t.amount > 0 ? '#1A8A4A' : '#1A1A1A',
       })),
     };
@@ -183,7 +191,9 @@ export function AppProvider({ children }) {
     activeNav:'dashboard', showAI:true,
     aiMessages:[], aiInputVal:'', aiTyping:false,
     txSearch:'',
-    budgets:INITIAL_BUDGETS,
+    transactions:[],
+    snapshot:null,
+    budgets:[],
     authLoading:false,
     authError:'',
     isDemoMode:false,
@@ -192,6 +202,27 @@ export function AppProvider({ children }) {
   const up = useCallback((patch) => setState(s => ({ ...s, ...patch })), []);
   const signingOutRef = useRef(false);
   const demoModeRef = useRef(false);
+
+  const loadAppData = useCallback(async () => {
+    try {
+      const [txData, budgetData, snap] = await Promise.all([
+        fetchTransactions(),
+        fetchBudgetsWithSpent(),
+        fetchSnapshot(),
+      ]);
+      up({ transactions: txData, budgets: budgetData, snapshot: snap });
+    } catch (err) {
+      console.error('loadAppData error:', err);
+    }
+  }, [up]);
+
+  // Load real data when user reaches the app page
+  useEffect(() => {
+    if (state.page === 'app' && state.user && !state.isDemoMode) {
+      loadAppData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.page, state.user?.id, state.isDemoMode]);
 
   // Session listener — single source of truth for auth routing
   useEffect(() => {
@@ -219,7 +250,9 @@ export function AppProvider({ children }) {
           ...s,
           ...emptyAuthState('landing'),
           authInitializing: false,
-          budgets: INITIAL_BUDGETS,
+          transactions: [],
+          snapshot: null,
+          budgets: [],
         }));
         return;
       }
@@ -235,7 +268,9 @@ export function AppProvider({ children }) {
         ...route,
         authInitializing: false,
         authLoading: false,
-        budgets: INITIAL_BUDGETS,
+        transactions: [],
+        snapshot: null,
+        budgets: [],
       }));
     }
 
@@ -335,7 +370,30 @@ export function AppProvider({ children }) {
       signingOutRef.current = false;
     }
     demoModeRef.current = true;
-    up({ ...demoAppState(), budgets: INITIAL_BUDGETS });
+    const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+    const demoBudgets = INITIAL_BUDGETS.map(b => ({
+      category: b.cat,
+      icon: b.icon,
+      color: b.color,
+      limit_amount: b.limit,
+      spent: b.spent,
+      month: currentMonth,
+    }));
+    up({ ...demoAppState(), transactions: TRANSACTIONS, budgets: demoBudgets, snapshot: null });
+  }
+
+  async function addTransaction(txData) {
+    const { user } = state;
+    if (!user) return;
+    await insertTransaction({ ...txData, user_id: user.id });
+    await loadAppData();
+  }
+
+  async function addBudget(budgetData) {
+    const { user } = state;
+    if (!user) return;
+    await insertBudget({ ...budgetData, user_id: user.id });
+    await loadAppData();
   }
 
   async function submitAuth(e) {
@@ -365,7 +423,7 @@ export function AppProvider({ children }) {
   async function handleSignOut() {
     if (state.isDemoMode) {
       demoModeRef.current = false;
-      up({ ...emptyAuthState('landing'), budgets: INITIAL_BUDGETS });
+      up({ ...emptyAuthState('landing'), transactions: [], snapshot: null, budgets: [] });
       return;
     }
     signingOutRef.current = true;
@@ -381,11 +439,13 @@ export function AppProvider({ children }) {
       ...s,
       ...emptyAuthState('landing'),
       authInitializing: false,
-      budgets: INITIAL_BUDGETS,
+      transactions: [],
+      snapshot: null,
+      budgets: [],
     }));
   }
 
-  const value = { state, up, goTo, startChat, selectMCQOption, sendChatMessage, sendAIMessage, tryDemo, submitAuth, handleSignOut };
+  const value = { state, up, goTo, startChat, selectMCQOption, sendChatMessage, sendAIMessage, tryDemo, submitAuth, handleSignOut, addTransaction, addBudget, loadAppData };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
