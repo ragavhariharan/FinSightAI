@@ -1,16 +1,6 @@
 <div align="center">
 
-<img src="./docs/assets/logo-mark.png" alt="FinSight" width="72" />
-
-<h1>FinSight</h1>
-
-<p><strong>Persona-aware personal finance for India</strong></p>
-
-<p><sub>Track spending, hit savings goals, talk to your money with Kash</sub></p>
-
-<br />
-
-<img src="./docs/assets/banner.png" alt="FinSight dashboard, budgets, investments, Kash AI, net worth" width="800" />
+<img src="docs/assets/readme-header.png" width="720" />
 
 <br /><br />
 
@@ -105,7 +95,7 @@ Open the app and use **Try live demo** for a full interactive session with no si
 ## Architecture
 
 <p align="center">
-  <img src="./docs/assets/architecture.png" alt="FinSight architecture" width="100%" />
+  <img src="docs/assets/architecture.png" width="100%" />
 </p>
 
 | Layer | Technology |
@@ -139,7 +129,7 @@ Use **Try live demo** to explore without Supabase. For production: `npm run buil
 ```
 src/           pages, views, components, lib, context
 supabase/      migrations, edge functions
-docs/assets/   README branding (logo, banner, architecture SVG)
+docs/assets/   README branding (header, architecture PNG)
 ```
 
 ## Data and privacy
