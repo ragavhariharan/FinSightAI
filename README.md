@@ -1,8 +1,15 @@
-<div align="center">
+<p align="center">
+  <img src="docs/assets/logo-mark.png" width="72" />
+</p>
 
-<img src="docs/assets/readme-header.png" width="720" />
+<h1 align="center">FinSight</h1>
 
-<br /><br />
+<p align="center">
+  <strong>Persona-aware personal finance for India</strong><br />
+  Track spending, hit savings goals, talk to your money with Kash.
+</p>
+
+<p align="center">
 
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -10,16 +17,19 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![INR](https://img.shields.io/badge/INR-F05A22?style=flat-square)](.)
 
-<br /><br />
+</p>
 
-[Features](#features) · [Screenshot](#screenshot) · [Architecture](#architecture) · [Getting started](#getting-started)
-
-</div>
+<p align="center">
+  <a href="#features">Features</a> ·
+  <a href="#screenshot">Screenshot</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#getting-started">Getting started</a>
+</p>
 
 ## Screenshot
 
 <p align="center">
-  <img src="./ss.png" alt="FinSight dashboard" width="92%" />
+  <img src="ss.png" alt="FinSight dashboard" width="92%" />
 </p>
 
 ## Overview
@@ -129,7 +139,7 @@ Use **Try live demo** to explore without Supabase. For production: `npm run buil
 ```
 src/           pages, views, components, lib, context
 supabase/      migrations, edge functions
-docs/assets/   README branding (header, architecture PNG)
+docs/assets/   README branding (logo, architecture PNG)
 ```
 
 ## Data and privacy
@@ -138,7 +148,6 @@ docs/assets/   README branding (header, architecture PNG)
 - OpenRouter keys only in Edge Function secrets, never in the frontend bundle
 - Preferences in `localStorage`; Kash session in `sessionStorage`
 
-<div align="center">
-<br />
-<sub><strong>FinSight</strong> · built for how Indians earn, spend, and save</sub>
-</div>
+<p align="center">
+  <sub><strong>FinSight</strong> · built for how Indians earn, spend, and save</sub>
+</p>
