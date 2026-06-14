@@ -293,23 +293,42 @@ export async function fetchSavingsGoals() {
 
 export async function insertSavingsGoal(goal) {
   const user_id = await uid();
-  const targetDays = goal.target_days || (Number(goal.target_years) || 2) * 365;
-  const years = goal.target_years || Math.max(1, Math.ceil(targetDays / 365));
-  const targetDate = new Date();
-  targetDate.setDate(targetDate.getDate() + targetDays);
-  const { data, error } = await supabase.from('savings_goals').insert({
+  const row = {
     user_id,
-    title: goal.title,
-    target: goal.target,
-    target_years: years,
-    target_days: targetDays,
-    target_date: targetDate.toISOString().slice(0, 10),
+    title: goal.title.trim(),
+    target: Number(goal.target),
     icon: goal.icon || 'goals',
     color: goal.color || '#1F7A5E',
-    goal_key: goal.goal_key,
-  }).select().single();
+  };
+  const targetDays = goal.target_days ?? timelineToDays(goal.target_years || 2, 'years');
+  const extended = { ...row };
+  if (targetDays > 0) {
+    extended.target_days = targetDays;
+    extended.target_years = goal.target_years || Math.max(1, Math.ceil(targetDays / 365));
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + targetDays);
+    extended.target_date = targetDate.toISOString().slice(0, 10);
+  }
+  let { data, error } = await supabase.from('savings_goals').insert(extended).select().single();
+  if (error && /column/i.test(error.message || '')) {
+    ({ data, error } = await supabase.from('savings_goals').insert(row).select().single());
+  }
   if (error) throw error;
   return data;
+}
+
+function timelineToDays(value, unit = 'years') {
+  const v = Math.max(1, Number(value) || 1);
+  if (unit === 'days') return v;
+  if (unit === 'months') return Math.round(v * 30.44);
+  return Math.round(v * 365.25);
+}
+
+export async function deleteSavingsGoal(id) {
+  const dbId = Number(id);
+  if (!dbId || Number.isNaN(dbId)) throw new Error('Invalid goal id');
+  const { error } = await supabase.from('savings_goals').delete().eq('id', dbId);
+  if (error) throw error;
 }
 
 // ─── News cache ───────────────────────────────────────────────────────────────

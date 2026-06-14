@@ -15,5 +15,8 @@ export function formatAuthError(err) {
   if (lower.includes('email not confirmed')) {
     return 'Please confirm your email before signing in. Check your inbox (and spam).';
   }
+  if (lower.includes('requested path is invalid') || lower.includes('redirect')) {
+    return `Google sign-in redirect URL is not allowed. In Supabase → Authentication → URL Configuration, add: ${typeof window !== 'undefined' ? window.location.origin : 'your app URL'} (and http://127.0.0.1:5173 if you use that locally).`;
+  }
   return msg;
 }

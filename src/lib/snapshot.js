@@ -41,6 +41,23 @@ export function recomputeBudgetsFromTransactions(transactions, budgets = []) {
   return budgets.map(b => ({ ...b, spent: spent[b.cat] || 0 }));
 }
 
+/** Health score aligned with Postgres recompute_dashboard_snapshot */
+export function computeHealthScore({ savings_rate_pct = 0, budget_used_pct = 0, hasActivity = false }) {
+  if (!hasActivity) return null;
+  const rate = Number(savings_rate_pct) || 0;
+  let health = 50 + Math.floor(rate / 2);
+  if (budget_used_pct > 100) health -= 15;
+  else if (budget_used_pct > 90) health -= 8;
+  return Math.min(100, Math.max(0, health));
+}
+
+export function healthLabelForScore(score, rate = 0) {
+  if (score == null) return 'Add transactions to score';
+  if (score >= 70) return 'Good standing';
+  if (score >= 50) return rate >= 0 ? 'Fair' : 'Needs attention';
+  return 'Needs attention';
+}
+
 /** Client-side snapshot recompute — keeps dashboard/reports in sync with transactions */
 export function recomputeSnapshotFromTransactions(transactions = [], budgets = []) {
   const monthTx = transactions.filter(t => inCurrentMonth(t.txn_date));
@@ -48,6 +65,7 @@ export function recomputeSnapshotFromTransactions(transactions = [], budgets = [
   const spend = monthTx.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
   const net = income - spend;
   const rate = income > 0 ? Math.round((net / income) * 1000) / 10 : 0;
+  const hasActivity = monthTx.length > 0;
 
   const catMap = {};
   monthTx.filter(t => t.amount < 0).forEach(t => {
@@ -75,6 +93,7 @@ export function recomputeSnapshotFromTransactions(transactions = [], budgets = [
 
   const expenses = monthTx.filter(t => t.amount < 0);
   const largest = expenses.length ? Math.max(...expenses.map(t => Math.abs(t.amount))) : 0;
+  const health_score = computeHealthScore({ savings_rate_pct: rate, budget_used_pct, hasActivity });
 
   return {
     monthly_income: income,
@@ -86,8 +105,8 @@ export function recomputeSnapshotFromTransactions(transactions = [], budgets = [
     donut_segments,
     transaction_count: monthTx.length,
     largest_expense: largest,
-    health_score: rate >= 25 ? 78 : rate >= 15 ? 68 : rate >= 0 ? 52 : 35,
-    health_label: rate >= 20 ? 'Good standing' : rate >= 0 ? 'Watch spending' : 'Overspending',
+    health_score,
+    health_label: healthLabelForScore(health_score, rate),
     forecast: { projected_savings: projected, points },
     leaks: [],
     spending_dna: {},

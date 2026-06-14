@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useApp } from '../context';
 import { ASSISTANT_NAME } from '../lib/assistant';
 import { gaugeFromScore, forecastPathsFromPoints, formatRupee, currentMonthLabel } from '../lib/format';
@@ -6,6 +6,7 @@ import { buildBriefing, dashboardSubtitle } from '../lib/briefing';
 import { chartColor } from '../lib/chartColors';
 import { sortTransactionsDesc } from '../lib/snapshot';
 import { userTransactionsOnly } from '../lib/format';
+import { fetchAccounts, totalBalance } from '../lib/accounts';
 import AnimatedNumber from '../components/ui/AnimatedNumber';
 import Icon from '../components/ui/Icon';
 import CategoryIcon from '../components/ui/CategoryIcon';
@@ -33,26 +34,32 @@ function StatCard({ label, value, format, sub, accent, delay, icon }) {
   );
 }
 
-function HealthRing({ score }) {
-  const g = gaugeFromScore(score);
+function HealthRing({ score, label }) {
+  const hasScore = score != null;
+  const g = gaugeFromScore(hasScore ? score : 0);
   return (
     <div style={{ position: 'relative', width: 128, height: 128, flexShrink: 0 }}>
       <svg width="128" height="128" viewBox="0 0 120 120">
         <circle className="fs-ring-track" cx="60" cy="60" r="46" fill="none" strokeWidth="10" />
-        <circle
-          className="fs-ring-fill"
-          cx="60" cy="60" r="46" fill="none" strokeWidth="10" strokeLinecap="round"
-          stroke={g.color}
-          strokeDasharray={g.circumference}
-          strokeDashoffset={g.dashOffset}
-          transform={g.transform}
-        />
+        {hasScore && (
+          <circle
+            className="fs-ring-fill"
+            cx="60" cy="60" r="46" fill="none" strokeWidth="10" strokeLinecap="round"
+            stroke={g.color}
+            strokeDasharray={g.circumference}
+            strokeDashoffset={g.dashOffset}
+            transform={g.transform}
+          />
+        )}
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="fs-metric fs-metric-lg" style={{ color: g.color, lineHeight: 1 }}>
-          <AnimatedNumber value={g.score} format={(n) => Math.round(n)} />
+        <div className="fs-metric fs-metric-lg" style={{ color: hasScore ? g.color : 'var(--fs-text-muted)', lineHeight: 1, fontSize: hasScore ? undefined : '1.5rem' }}>
+          {hasScore ? <AnimatedNumber value={g.score} format={(n) => Math.round(n)} /> : '—'}
         </div>
         <div className="fs-label" style={{ marginTop: 3 }}>Health</div>
+        {!hasScore && label && (
+          <div className="fs-subtitle" style={{ fontSize: '0.62rem', marginTop: 4, textAlign: 'center', maxWidth: 90 }}>{label}</div>
+        )}
       </div>
     </div>
   );
@@ -62,6 +69,15 @@ export default function Dashboard() {
   const { state, up, setActiveNav } = useApp();
   const { snapshot, fullName, dataLoading, transactions, questionnaire } = state;
   const snap = snapshot || {};
+  const [bankTotal, setBankTotal] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAccounts()
+      .then(list => { if (!cancelled) setBankTotal(totalBalance(list)); })
+      .catch(() => { if (!cancelled) setBankTotal(0); });
+    return () => { cancelled = true; };
+  }, [transactions.length, dataLoading]);
   const forecast = useMemo(() => forecastPathsFromPoints(snap.forecast?.points), [snap.forecast]);
   const today = new Date().getDate();
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
@@ -102,8 +118,19 @@ export default function Dashboard() {
             {briefing}
           </p>
         </div>
-        <HealthRing score={snap.health_score || 0} />
+        <HealthRing score={snap.health_score} label={snap.health_label} />
       </div>
+
+      {bankTotal > 0 && (
+        <div className="fs-card fs-card-padded fs-animate-in fs-animate-in-delay-1" style={{ marginBottom: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div className="fs-label">Bank balance</div>
+            <div className="fs-metric fs-metric-lg" style={{ marginTop: 6 }}>{formatRupee(bankTotal)}</div>
+            <p className="fs-subtitle" style={{ marginTop: 6, marginBottom: 0, fontSize: '0.8125rem' }}>Across linked accounts · updates when you log transactions</p>
+          </div>
+          <button className="fs-btn fs-btn-ghost fs-btn-sm" onClick={() => setActiveNav('accounts')}>Manage accounts</button>
+        </div>
+      )}
 
       <div className="fs-stat-grid-3" style={{ marginBottom: 18 }}>
         <StatCard

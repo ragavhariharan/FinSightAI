@@ -6,6 +6,7 @@ import { readStoredShowAI } from '../lib/appRoute';
 import Logo from '../components/ui/Logo';
 import Icon from '../components/ui/Icon';
 import ResizeHandle from '../components/ResizeHandle';
+import FirstAccountModal from '../components/FirstAccountModal';
 import AddTransactionModal from '../components/AddTransactionModal';
 import AISidebar from '../components/AISidebar';
 import Dashboard from '../views/Dashboard';
@@ -46,8 +47,8 @@ function formatDate() {
 }
 
 export default function AppShell() {
-  const { state, up, setActiveNav, handleSignOut, refreshAppData, setSidebarWidth, setAiPanelWidth, updateSettings } = useApp();
-  const { activeNav, showAI, persona, fullName, settings } = state;
+  const { state, up, setActiveNav, handleSignOut, refreshAppData, setSidebarWidth, setAiPanelWidth, updateSettings, dismissAccountPrompt } = useApp();
+  const { activeNav, showAI, persona, fullName, settings, showAccountPrompt } = state;
   const [showAddTx, setShowAddTx] = useState(false);
   const collapsed = settings.sidebarCollapsed;
   const sections = visibleNav(settings);
@@ -68,8 +69,13 @@ export default function AppShell() {
   }
 
   return (
-    <div className={`fs-app ${collapsed ? 'fs-sidebar-is-collapsed' : ''}`}>
+    <div className={`fs-app ${collapsed ? 'fs-sidebar-is-collapsed' : ''} ${showAccountPrompt ? 'fs-account-prompt-open' : ''}`}>
       <AddTransactionModal open={showAddTx} onClose={() => setShowAddTx(false)} onSaved={refreshAppData} />
+      <FirstAccountModal
+        open={showAccountPrompt}
+        onClose={() => dismissAccountPrompt(false)}
+        onSaved={() => dismissAccountPrompt(true)}
+      />
 
       <aside className={`fs-sidebar fs-sidebar-resizable ${collapsed ? 'collapsed' : ''}`}>
         <div style={{ padding: collapsed ? '20px 12px 14px' : '20px 16px 14px', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', gap: 8 }}>

@@ -9,6 +9,11 @@ export async function addGoal(goal) {
   return loadGoals();
 }
 
+export async function removeGoal(id) {
+  await api.deleteSavingsGoal(id);
+  return loadGoals();
+}
+
 export function timelineToDays(value, unit = 'years') {
   const v = Math.max(1, Number(value) || 1);
   if (unit === 'days') return v;

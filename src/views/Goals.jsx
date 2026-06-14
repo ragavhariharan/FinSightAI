@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../context';
 import { useFeatureData } from '../hooks/useFeatureData';
-import { loadGoals, addGoal, goalProgress, timelineToDays, formatGoalTimeline } from '../lib/goals';
+import { loadGoals, addGoal, removeGoal, goalProgress, timelineToDays, formatGoalTimeline } from '../lib/goals';
 import { formatRupee } from '../lib/format';
 import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
@@ -10,31 +10,65 @@ import Select from '../components/ui/Select';
 const loadG = () => loadGoals();
 
 export default function Goals() {
-  const { state } = useApp();
+  const { state, up } = useApp();
   const { snapshot } = state;
   const snap = snapshot || {};
   const { data: goals, loading, setData } = useFeatureData(loadG, []);
   const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
   const [form, setForm] = useState({ title: '', target: '', timeline_value: 6, timeline_unit: 'months' });
   const savings = snap.net_savings || 0;
   const income = snap.monthly_income || 0;
 
   async function handleAdd(e) {
     e.preventDefault();
-    if (!form.title || !form.target) return;
-    const goal = {
-      id: `g${Date.now()}`,
-      title: form.title,
-      target: Number(form.target),
-      target_days: timelineToDays(form.timeline_value, form.timeline_unit),
-      target_years: form.timeline_unit === 'years' ? Number(form.timeline_value) : undefined,
-      icon: 'goals',
-      color: '#1F7A5E',
-    };
-    const next = await addGoal(goal);
-    setData(next);
-    setForm({ title: '', target: '', timeline_value: 6, timeline_unit: 'months' });
-    setShowAdd(false);
+    setFormError('');
+    const target = Number(form.target);
+    const timelineValue = Number(form.timeline_value);
+    if (!form.title.trim()) {
+      setFormError('Enter a goal name.');
+      return;
+    }
+    if (!target || target <= 0) {
+      setFormError('Enter a valid target amount.');
+      return;
+    }
+    if (!timelineValue || timelineValue <= 0) {
+      setFormError('Enter a valid timeline.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const goal = {
+        title: form.title.trim(),
+        target,
+        target_days: timelineToDays(timelineValue, form.timeline_unit),
+        target_years: form.timeline_unit === 'years' ? timelineValue : undefined,
+        icon: 'goals',
+        color: '#1F7A5E',
+      };
+      const next = await addGoal(goal);
+      setData(next);
+      setForm({ title: '', target: '', timeline_value: 6, timeline_unit: 'months' });
+      setShowAdd(false);
+    } catch (err) {
+      setFormError(err.message || 'Could not save goal. Check you are signed in.');
+      up({ authError: err.message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(goal) {
+    const id = goal.dbId || goal.id;
+    if (!window.confirm(`Delete goal "${goal.title}"?`)) return;
+    try {
+      const next = await removeGoal(id);
+      setData(next);
+    } catch (err) {
+      up({ authError: err.message || 'Could not delete goal' });
+    }
   }
 
   return (
@@ -44,13 +78,13 @@ export default function Goals() {
           <h2 className="fs-h1" style={{ marginBottom: 4 }}>Savings goals</h2>
           <p className="fs-subtitle">Set a target and timeline — we track progress from your monthly savings</p>
         </div>
-        <button className="fs-btn fs-btn-primary fs-btn-sm" onClick={() => setShowAdd(!showAdd)}>Add goal</button>
+        <button className="fs-btn fs-btn-primary fs-btn-sm" onClick={() => { setShowAdd(!showAdd); setFormError(''); }}>Add goal</button>
       </header>
 
       {showAdd && (
         <form onSubmit={handleAdd} className="fs-card fs-card-padded" style={{ marginBottom: 18, display: 'grid', gap: 12 }}>
           <input className="fs-input" placeholder="Goal name (e.g. House down payment)" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
-          <input className="fs-input" type="number" placeholder="Target amount (₹)" value={form.target} onChange={e => setForm(f => ({ ...f, target: e.target.value }))} required />
+          <input className="fs-input" type="number" min="1" placeholder="Target amount (₹)" value={form.target} onChange={e => setForm(f => ({ ...f, target: e.target.value }))} required />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label className="fs-label" style={{ display: 'block', marginBottom: 6 }}>Timeline</label>
@@ -69,7 +103,8 @@ export default function Goals() {
               />
             </div>
           </div>
-          <button type="submit" className="fs-btn fs-btn-primary">Save goal</button>
+          {formError && <p style={{ color: 'var(--fs-danger)', fontSize: '0.8125rem', margin: 0 }}>{formError}</p>}
+          <button type="submit" className="fs-btn fs-btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save goal'}</button>
         </form>
       )}
 
@@ -85,8 +120,8 @@ export default function Goals() {
             const timelineLabel = formatGoalTimeline(goal);
             return (
               <div key={goal.id} className={`fs-card fs-card-padded fs-animate-in fs-animate-in-delay-${Math.min(i + 1, 4)}`}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                     <Icon name={goal.icon || 'goals'} size={22} style={{ color: goal.color, flexShrink: 0 }} />
                     <div>
                       <div style={{ fontSize: '0.9375rem', fontWeight: 600 }}>{goal.title}</div>
@@ -95,7 +130,10 @@ export default function Goals() {
                       </div>
                     </div>
                   </div>
-                  <span className={`fs-badge ${onTrack ? 'fs-badge-brand' : 'fs-badge-muted'}`}>{pct}%</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className={`fs-badge ${onTrack ? 'fs-badge-brand' : 'fs-badge-muted'}`}>{pct}%</span>
+                    <button className="fs-btn fs-btn-ghost fs-btn-sm" style={{ color: 'var(--fs-danger)' }} onClick={() => handleDelete(goal)} aria-label="Delete goal">Delete</button>
+                  </div>
                 </div>
                 <div className="fs-progress-track" style={{ height: 8, marginBottom: 8 }}>
                   <div className="fs-progress-fill fs-progress-fill-animated" style={{ width: `${pct}%`, background: goal.color }} />

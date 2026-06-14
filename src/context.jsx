@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { signUpWithEmail, signInWithEmail, signOut, resolveSessionState } from './lib/auth';
+import { signUpWithEmail, signInWithEmail, signOut, resolveSessionState, readOAuthCallbackError } from './lib/auth';
 import { supabase, PERSONA_LABEL_TO_DB } from './lib/supabase';
 import { PUBLIC_PAGES, emptyAuthState } from './lib/routing';
 import { loadAppData } from './lib/data';
@@ -11,8 +11,29 @@ import { ASSISTANT_NAME } from './lib/assistant';
 import { viewFromPathname, syncUrl, readStoredShowAI, storeShowAI, APP_VIEWS } from './lib/appRoute';
 import { groupTransactions } from './lib/format';
 import { recordTransaction, undoTransaction } from './lib/transactionFlow';
+import { fetchAccounts } from './lib/accounts';
 
-const COPILOT_SESSION_KEY = 'finsight_copilot_msgs';
+const ACCOUNT_PROMPT_KEY = 'finsight_account_prompt_done';
+
+function accountPromptKey(userId) {
+  return `${ACCOUNT_PROMPT_KEY}_${userId}`;
+}
+
+function readAccountPromptDone(userId) {
+  if (!userId) return true;
+  try {
+    return localStorage.getItem(accountPromptKey(userId)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markAccountPromptDone(userId) {
+  if (!userId) return;
+  try {
+    localStorage.setItem(accountPromptKey(userId), '1');
+  } catch { /* ignore */ }
+}
 const COPILOT_OWNER_KEY = 'finsight_copilot_owner';
 
 function copilotWelcome(persona, fullName) {
@@ -84,6 +105,7 @@ export function AppProvider({ children }) {
       dataLoading: false,
       authLoading: false,
       authError: '',
+      showAccountPrompt: false,
       settings,
     };
   });
@@ -108,6 +130,11 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     let mounted = true;
+
+    const oauthErr = readOAuthCallbackError();
+    if (oauthErr) {
+      up({ page: 'auth', authMode: 'login', authError: formatAuthError({ message: oauthErr }) });
+    }
 
     async function applySession(session) {
       if (!mounted) return;
@@ -329,6 +356,17 @@ export function AppProvider({ children }) {
       }).eq('id', user.id);
     }
     await refreshAppData();
+    let showAccountPrompt = user ? !readAccountPromptDone(user.id) : false;
+    if (showAccountPrompt) {
+      try {
+        const accounts = await fetchAccounts();
+        if (accounts.length > 0) {
+          showAccountPrompt = false;
+          markAccountPromptDone(user.id);
+        }
+      } catch { /* ignore */ }
+    }
+    up({ showAccountPrompt });
   }
 
   async function finishOnboarding() {
@@ -400,11 +438,18 @@ export function AppProvider({ children }) {
     });
   }
 
+  function dismissAccountPrompt(saved = false) {
+    const uid = stateRef.current.user?.id;
+    if (uid) markAccountPromptDone(uid);
+    up({ showAccountPrompt: false });
+    if (saved) refreshAppData();
+  }
+
   const value = {
     state, up, goTo, setActiveNav, submitOnboardingStep, finishQuestionnaire, sendAIMessage,
     submitAuth, handleSignOut, refreshAppData, addTransaction, removeTransaction,
     updateSettings, setSidebarWidth, setAiPanelWidth, resetAppSettings, updateProfile,
-    clearAssistantChat, exportUserData,
+    clearAssistantChat, exportUserData, dismissAccountPrompt,
     getTxGroups: (search) => groupTransactions(stateRef.current.transactions, search),
   };
 
