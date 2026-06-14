@@ -1,8 +1,18 @@
 <div align="center">
 
-<img src="./docs/assets/banner.svg" alt="" width="100%" />
+<img src="./docs/assets/logo-mark.png" alt="FinSight" width="72" />
+
+<h1>FinSight</h1>
+
+<p><strong>Persona-aware personal finance for India</strong></p>
+
+<p><sub>Track spending, hit savings goals, talk to your money with Kash</sub></p>
 
 <br />
+
+<img src="./docs/assets/banner.png" alt="FinSight dashboard, budgets, investments, Kash AI, net worth" width="800" />
+
+<br /><br />
 
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -95,7 +105,7 @@ Open the app and use **Try live demo** for a full interactive session with no si
 ## Architecture
 
 <p align="center">
-  <img src="./docs/assets/architecture.svg" alt="FinSight architecture" width="100%" />
+  <img src="./docs/assets/architecture.png" alt="FinSight architecture" width="100%" />
 </p>
 
 | Layer | Technology |
