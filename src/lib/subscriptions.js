@@ -15,6 +15,15 @@ export const OTHER_RECURRING = [
   { service: 'Rent', category: 'Housing', defaultAmount: 15000 },
 ];
 
+export const PRESET_SERVICES = new Set([
+  ...OTT_SERVICES.map(s => s.service),
+  ...OTHER_RECURRING.map(s => s.service),
+]);
+
+export function isPresetService(service) {
+  return PRESET_SERVICES.has(service);
+}
+
 export async function fetchSubscriptions(isDemoMode, userId) {
   if (isDemoMode) return loadFeature('demo', DEMO_SUBS_KEY, []);
   if (!userId) return [];
@@ -67,6 +76,61 @@ export async function updateSubscriptionAmount(isDemoMode, userId, service, amou
     return next;
   }
   const { error } = await supabase.from('user_subscriptions').update({ amount: Number(amount) }).eq('service', service);
+  if (error) throw error;
+  return fetchSubscriptions(false, userId);
+}
+
+export async function addCustomSubscription(isDemoMode, userId, { service, category, amount }) {
+  const name = (service || '').trim();
+  if (!name) throw new Error('Enter a name for this recurring expense');
+  if (isPresetService(name)) throw new Error('Use the preset card for this service');
+
+  const current = await fetchSubscriptions(isDemoMode, userId);
+  if (current.some(s => s.service.toLowerCase() === name.toLowerCase())) {
+    throw new Error('This recurring expense already exists');
+  }
+
+  const monthly = Number(amount);
+  if (!monthly || monthly <= 0) throw new Error('Enter a valid monthly amount');
+
+  if (isDemoMode) {
+    const next = [...current, {
+      id: `sub${Date.now()}`,
+      service: name,
+      category: category || 'Other',
+      amount: monthly,
+      active: true,
+    }];
+    saveFeature('demo', DEMO_SUBS_KEY, next);
+    return next;
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabase.from('user_subscriptions').insert({
+    user_id: user.id,
+    service: name,
+    category: category || 'Other',
+    amount: monthly,
+    active: true,
+    billing_cycle: 'monthly',
+  });
+  if (error) throw error;
+  return fetchSubscriptions(false, user.id);
+}
+
+export async function removeSubscription(isDemoMode, userId, service) {
+  if (isPresetService(service)) throw new Error('Preset subscriptions cannot be removed');
+
+  if (isDemoMode) {
+    const current = loadFeature('demo', DEMO_SUBS_KEY, []);
+    const next = current.filter(s => s.service !== service);
+    saveFeature('demo', DEMO_SUBS_KEY, next);
+    return next;
+  }
+
+  const { error } = await supabase.from('user_subscriptions').delete().eq('service', service);
   if (error) throw error;
   return fetchSubscriptions(false, userId);
 }

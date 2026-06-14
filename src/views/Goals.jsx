@@ -4,7 +4,6 @@ import { useFeatureData } from '../hooks/useFeatureData';
 import { loadGoals, addGoal, goalProgress, timelineToDays, formatGoalTimeline } from '../lib/goals';
 import { formatRupee } from '../lib/format';
 import Icon from '../components/ui/Icon';
-import { tint } from '../lib/categories';
 import EmptyState from '../components/ui/EmptyState';
 import Select from '../components/ui/Select';
 
@@ -88,9 +87,7 @@ export default function Goals() {
               <div key={goal.id} className={`fs-card fs-card-padded fs-animate-in fs-animate-in-delay-${Math.min(i + 1, 4)}`}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: tint(goal.color, 0.1), color: goal.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name={goal.icon || 'goals'} size={21} />
-                    </div>
+                    <Icon name={goal.icon || 'goals'} size={22} style={{ color: goal.color, flexShrink: 0 }} />
                     <div>
                       <div style={{ fontSize: '0.9375rem', fontWeight: 600 }}>{goal.title}</div>
                       <div className="fs-subtitle fs-money" style={{ fontSize: '0.75rem' }}>

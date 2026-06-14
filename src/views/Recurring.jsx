@@ -7,11 +7,16 @@ import {
   fetchSubscriptions,
   toggleSubscription,
   updateSubscriptionAmount,
+  addCustomSubscription,
+  removeSubscription,
+  isPresetService,
   OTT_SERVICES,
   OTHER_RECURRING,
 } from '../lib/subscriptions';
 import CategoryIcon from '../components/ui/CategoryIcon';
 import EmptyState from '../components/ui/EmptyState';
+import Icon from '../components/ui/Icon';
+import AddCustomRecurringModal from '../components/AddCustomRecurringModal';
 
 const loadSubs = (isDemo, uid) => fetchSubscriptions(isDemo, uid);
 
@@ -23,11 +28,17 @@ export default function Recurring() {
   const { transactions } = state;
   const { data: subs, loading, setData } = useFeatureData(loadSubs, []);
   const [amountEdits, setAmountEdits] = useState({});
+  const [showAddCustom, setShowAddCustom] = useState(false);
 
   const recurring = useMemo(() => detectRecurring(transactions), [transactions]);
   const activeSubs = (subs || []).filter(s => s.active);
   const subMonthly = activeSubs.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const detectedMonthly = recurring.reduce((s, r) => s + r.amount, 0);
+
+  const customSubs = useMemo(
+    () => (subs || []).filter(s => !isPresetService(s.service)),
+    [subs],
+  );
 
   async function handleToggle(service, meta, active) {
     const next = await toggleSubscription(state.isDemoMode, state.user?.id, service, meta, active);
@@ -42,7 +53,22 @@ export default function Recurring() {
     setAmountEdits(e => ({ ...e, [service]: undefined }));
   }
 
-  function SubCard({ meta }) {
+  async function handleAddCustom(payload) {
+    const next = await addCustomSubscription(state.isDemoMode, state.user?.id, payload);
+    setData(next);
+  }
+
+  async function handleRemove(service) {
+    const next = await removeSubscription(state.isDemoMode, state.user?.id, service);
+    setData(next);
+    setAmountEdits(e => {
+      const copy = { ...e };
+      delete copy[service];
+      return copy;
+    });
+  }
+
+  function SubCard({ meta, custom = false }) {
     const row = (subs || []).find(s => s.service === meta.service);
     const active = !!row?.active;
     const amount = amountEdits[meta.service] ?? row?.amount ?? meta.defaultAmount;
@@ -56,16 +82,30 @@ export default function Recurring() {
         onKeyDown={e => e.key === 'Enter' && handleToggle(meta.service, meta, !active)}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: active ? 10 : 0 }}>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{meta.service}</div>
             <div className="fs-subtitle" style={{ fontSize: '0.72rem' }}>{meta.category}</div>
           </div>
-          <button
-            type="button"
-            className={`fs-toggle ${active ? 'on' : ''}`}
-            onClick={e => { e.stopPropagation(); handleToggle(meta.service, meta, !active); }}
-            aria-pressed={active}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {custom && (
+              <button
+                type="button"
+                className="fs-btn fs-btn-ghost fs-btn-icon"
+                style={{ width: 30, height: 30 }}
+                title="Remove"
+                aria-label={`Remove ${meta.service}`}
+                onClick={e => { e.stopPropagation(); handleRemove(meta.service); }}
+              >
+                <Icon name="trash" size={15} />
+              </button>
+            )}
+            <button
+              type="button"
+              className={`fs-toggle ${active ? 'on' : ''}`}
+              onClick={e => { e.stopPropagation(); handleToggle(meta.service, meta, !active); }}
+              aria-pressed={active}
+            />
+          </div>
         </div>
         {active && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
@@ -77,7 +117,7 @@ export default function Recurring() {
               value={amount}
               onChange={e => setAmountEdits(ed => ({ ...ed, [meta.service]: e.target.value }))}
             />
-            <button className="fs-btn fs-btn-primary fs-btn-sm" onClick={() => saveAmount(meta.service)}>Save</button>
+            <button type="button" className="fs-btn fs-btn-brand fs-btn-sm" onClick={() => saveAmount(meta.service)}>Save</button>
           </div>
         )}
         {active && (
@@ -91,12 +131,48 @@ export default function Recurring() {
 
   return (
     <div className="fs-content-inner fs-view-enter">
+      <AddCustomRecurringModal
+        open={showAddCustom}
+        onClose={() => setShowAddCustom(false)}
+        onSave={handleAddCustom}
+      />
+
       <header className="fs-animate-in" style={{ marginBottom: 22 }}>
         <h2 className="fs-h1" style={{ marginBottom: 4 }}>Recurring & subscriptions</h2>
         <p className="fs-subtitle">
           ~{formatRupee(subMonthly + detectedMonthly)}/mo committed · {activeSubs.length} active subscriptions
         </p>
       </header>
+
+      <div className="fs-card fs-card-padded fs-animate-in" style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12 }}>
+          <div className="fs-label" style={{ marginBottom: 0 }}>Custom recurring</div>
+          <button type="button" className="fs-btn fs-btn-secondary fs-btn-sm" onClick={() => setShowAddCustom(true)}>
+            <Icon name="plus" size={15} /> Add custom
+          </button>
+        </div>
+        {loading ? (
+          <div className="fs-skeleton" style={{ height: 80, borderRadius: 10 }} />
+        ) : customSubs.length === 0 ? (
+          <p className="fs-subtitle" style={{ fontSize: '0.8125rem', margin: 0 }}>
+            Add gym fees, EMIs, insurance premiums, or any bill that repeats every month.
+          </p>
+        ) : (
+          <div className="fs-sub-grid">
+            {customSubs.map(row => (
+              <SubCard
+                key={row.service}
+                custom
+                meta={{
+                  service: row.service,
+                  category: row.category || 'Other',
+                  defaultAmount: row.amount || 0,
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="fs-card fs-card-padded fs-animate-in" style={{ marginBottom: 18 }}>
         <div className="fs-label" style={{ marginBottom: 14 }}>Streaming (OTT)</div>

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useApp } from '../context';
 import { donutPathsFromSegments, formatRupee } from '../lib/format';
-import { categoryMeta } from '../lib/categories';
+import { chartColor } from '../lib/chartColors';
 import { detectRecurring } from '../lib/recurring';
 
 function inCurrentMonth(txnDate) {
@@ -22,10 +22,7 @@ export default function Reports() {
   const snap = snapshot || {};
 
   const segments = useMemo(() => {
-    return donutPathsFromSegments(snap.donut_segments).map(seg => ({
-      ...seg,
-      color: categoryMeta(seg.name).color,
-    }));
+    return donutPathsFromSegments(snap.donut_segments);
   }, [snap.donut_segments]);
 
   const totalSpend = (snap.donut_segments || []).reduce((s, c) => s + (c.amount || 0), 0);
@@ -83,7 +80,7 @@ export default function Reports() {
               className="fs-progress-fill"
               style={{
                 width: `${Math.min(100, budgetPct)}%`,
-                background: budgetPct > 90 ? 'var(--fs-danger)' : budgetPct > 70 ? 'var(--fs-warning)' : 'var(--fs-brand)',
+                background: budgetPct > 90 ? 'var(--fs-danger)' : budgetPct > 70 ? 'var(--fs-warning)' : 'var(--fs-primary)',
               }}
             />
           </div>
@@ -102,7 +99,7 @@ export default function Reports() {
                   ))}
                 </svg>
                 <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
-                  <div className="fs-money" style={{ fontFamily: "'Sora', sans-serif", fontSize: '1rem', fontWeight: 700 }}>
+                  <div className="fs-metric" style={{ fontSize: '1rem' }}>
                     <AnimatedNumber value={totalSpend} format={(n) => formatRupee(n)} />
                   </div>
                   <div className="fs-subtitle" style={{ fontSize: '0.72rem' }}>Total spent</div>
@@ -138,7 +135,7 @@ export default function Reports() {
                       <span className="fs-money" style={{ fontWeight: 600 }}>{formatRupee(amount)}</span>
                     </div>
                     <div className="fs-progress-track" style={{ height: 6 }}>
-                      <div className="fs-progress-fill" style={{ width: `${pct}%`, background: 'var(--fs-brand)' }} />
+                      <div className="fs-progress-fill" style={{ width: `${pct}%`, background: chartColor(i) }} />
                     </div>
                   </div>
                 );

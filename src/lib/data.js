@@ -45,11 +45,20 @@ export async function loadAppData(isDemoMode) {
 
   await purgePhantomTransactions();
 
-  const [transactions, budgets, snapshot] = await Promise.all([
+  const [transactions, budgets, dbSnapshot] = await Promise.all([
     fetchTransactions(),
     fetchBudgetsWithSpent(),
     ensureSnapshot(),
   ]);
 
-  return { transactions, budgets, snapshot: snapshot || {} };
+  const computed = recomputeSnapshotFromTransactions(transactions, budgets);
+  const snapshot = {
+    ...(dbSnapshot || {}),
+    ...computed,
+    forecast: computed.forecast,
+    donut_segments: computed.donut_segments?.length ? computed.donut_segments : (dbSnapshot?.donut_segments || []),
+    leaks: dbSnapshot?.leaks?.length ? dbSnapshot.leaks : computed.leaks,
+  };
+
+  return { transactions, budgets, snapshot };
 }

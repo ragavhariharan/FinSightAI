@@ -17,7 +17,7 @@ async function callOpenRouter(system: string, messages: { role: string; content:
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://finsight.app',
-      'X-Title': 'FinSight AI',
+      'X-Title': 'FinSight Kash',
     },
     body: JSON.stringify({
       model: MODEL,
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     ]);
 
     const snap = snapshotRow?.snapshot || {};
-    const system = `You are FinSight AI, a personal finance copilot for India. User persona: ${profile?.persona || 'salaried_employee'}.
+    const system = `You are Kash, the personal finance assistant for FinSight (India). User persona: ${profile?.persona || 'salaried_employee'}.
 Current snapshot: ${JSON.stringify(snap)}
 Recent transactions: ${JSON.stringify(transactions || [])}
 Respond in JSON only: {"reply":"natural language","actions":[{"type":"create_transaction","requires_confirmation":false,"data":{"name":"","amount":-500,"category":"Groceries","txn_date":"YYYY-MM-DD"}}]}

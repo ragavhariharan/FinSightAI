@@ -4,11 +4,11 @@
  * regardless of what emoji/color the data row happens to carry.
  */
 const META = {
-  'Paychecks':              { icon: 'income',        color: '#1F7A5E' },
-  'Business Revenue':       { icon: 'business',      color: '#1F7A5E' },
+  'Paychecks':              { icon: 'income',        color: '#56C982' },
+  'Business Revenue':       { icon: 'business',      color: '#56C982' },
   'Housing':                { icon: 'housing',       color: '#3E63DD' },
   'Food & Dining':          { icon: 'food',          color: '#C2453C' },
-  'Groceries':              { icon: 'groceries',     color: '#0E8C82' },
+  'Groceries':              { icon: 'groceries',     color: '#52B06E' },
   'Transport':              { icon: 'transport',     color: '#6E56CF' },
   'Shopping':               { icon: 'shopping',      color: '#B83280' },
   'Utilities':              { icon: 'utilities',     color: '#C28A00' },
@@ -16,8 +16,8 @@ const META = {
   'Insurance':              { icon: 'insurance',     color: '#5B6472' },
   'Entertainment':          { icon: 'entertainment', color: '#7A5AF8' },
   'Health':                 { icon: 'health',        color: '#C2453C' },
-  'Health & Fitness':       { icon: 'fitness',       color: '#0E8C82' },
-  'Fitness':                { icon: 'fitness',        color: '#0E8C82' },
+  'Health & Fitness':       { icon: 'fitness',       color: '#6E56CF' },
+  'Fitness':                { icon: 'fitness',        color: '#6E56CF' },
   'Business Costs':         { icon: 'business',      color: '#A5602B' },
   'Other':                  { icon: 'other',         color: '#5B6472' },
 };

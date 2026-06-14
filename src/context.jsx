@@ -6,28 +6,53 @@ import { loadAppData, clearDemoSession } from './lib/data';
 import { sendCopilotMessage, getLocalCopilotResponse } from './lib/api/copilot';
 import { completeOnboarding } from './lib/api/onboarding';
 import { formatAuthError } from './lib/formatAuthError';
-import { loadSettings, saveSettings, applyTheme, applyLayoutWidths } from './lib/settings';
+import { loadSettings, saveSettings, resetSettings, applyTheme, applyLayoutWidths, watchSystemTheme, initialsFromName } from './lib/settings';
+import { saveFeature, loadFeature } from './lib/featureStore';
+import { ASSISTANT_NAME } from './lib/assistant';
+import { viewFromPathname, syncUrl, readStoredShowAI, storeShowAI, APP_VIEWS } from './lib/appRoute';
 import { groupTransactions, mapTransactionRow } from './lib/format';
 import { recordTransaction, undoTransaction } from './lib/transactionFlow';
 
 const COPILOT_SESSION_KEY = 'finsight_copilot_msgs';
+const COPILOT_OWNER_KEY = 'finsight_copilot_owner';
 
 function copilotWelcome(persona, fullName) {
   const first = (fullName || '').split(' ')[0];
-  return `Hi${first ? ` ${first}` : ''}! I'm your FinSight copilot. Log transactions or ask about your ${persona || 'finances'}.`;
+  return `Hi${first ? ` ${first}` : ''}! I'm ${ASSISTANT_NAME}. Log a transaction or ask me anything about your ${persona || 'finances'}.`;
 }
 
-function loadCopilotFromSession(persona, fullName) {
-  try {
-    const raw = sessionStorage.getItem(COPILOT_SESSION_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
+function copilotOwnerId({ user, isDemoMode }) {
+  if (isDemoMode) return 'demo';
+  return user?.id || null;
+}
+
+function freshCopilotMessages(persona, fullName) {
   return [{ role: 'ai', text: copilotWelcome(persona, fullName) }];
 }
 
-function saveCopilotToSession(msgs) {
+function loadCopilotFromSession(persona, fullName, ownerId) {
+  if (!ownerId) return freshCopilotMessages(persona, fullName);
   try {
+    const storedOwner = sessionStorage.getItem(COPILOT_OWNER_KEY);
+    if (storedOwner !== ownerId) return freshCopilotMessages(persona, fullName);
+    const raw = sessionStorage.getItem(COPILOT_SESSION_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return freshCopilotMessages(persona, fullName);
+}
+
+function saveCopilotToSession(msgs, ownerId) {
+  if (!ownerId) return;
+  try {
+    sessionStorage.setItem(COPILOT_OWNER_KEY, ownerId);
     sessionStorage.setItem(COPILOT_SESSION_KEY, JSON.stringify(msgs));
+  } catch { /* ignore */ }
+}
+
+function clearCopilotSession() {
+  try {
+    sessionStorage.removeItem(COPILOT_SESSION_KEY);
+    sessionStorage.removeItem(COPILOT_OWNER_KEY);
   } catch { /* ignore */ }
 }
 
@@ -38,8 +63,10 @@ export function AppProvider({ children }) {
     const settings = loadSettings();
     applyTheme(settings.theme);
     applyLayoutWidths(settings.sidebarWidth, settings.aiPanelWidth);
+    const urlRoute = typeof window !== 'undefined' ? viewFromPathname() : { page: 'landing', view: 'dashboard' };
+    const storedShowAI = readStoredShowAI();
     return {
-    page:'landing',
+    page: urlRoute.page === 'auth' ? 'auth' : 'landing',
     authInitializing:true,
     user:null,
     fullName:'',
@@ -49,7 +76,8 @@ export function AppProvider({ children }) {
     mcqStep:0, mcqAnswers:{}, persona:'Salaried employee',
     onboardingStep: 0,
     questionnaire: {},
-    activeNav:'dashboard', showAI:true,
+    activeNav: urlRoute.view || 'dashboard',
+    showAI: storedShowAI ?? false,
     aiMessages:[], aiInputVal:'', aiTyping:false,
     txSearch:'',
     transactions:[],
@@ -88,7 +116,8 @@ export function AppProvider({ children }) {
     async function applySession(session) {
       if (!mounted) return;
       if (window.location.hash.includes('access_token')) {
-        window.history.replaceState(null, '', window.location.pathname);
+        const path = window.location.pathname || '/dashboard';
+        window.history.replaceState(null, '', path);
       }
       if (signingOutRef.current && session) return;
       if (!session && demoModeRef.current) {
@@ -97,13 +126,38 @@ export function AppProvider({ children }) {
       }
       if (!session) {
         demoModeRef.current = false;
-        setState(s => ({ ...s, ...emptyAuthState('landing'), authInitializing: false, transactions: [], budgets: [], snapshot: null }));
+        clearCopilotSession();
+        const urlRoute = viewFromPathname();
+        const page = urlRoute.page === 'auth' ? 'auth' : 'landing';
+        setState(s => ({ ...s, ...emptyAuthState(page), authInitializing: false, transactions: [], budgets: [], snapshot: null }));
+        syncUrl(page, 'dashboard');
         return;
       }
       demoModeRef.current = false;
       const route = await resolveSessionState(session);
       if (!mounted || signingOutRef.current) return;
-      setState(s => ({ ...s, ...route, authInitializing: false, authLoading: false, transactions: [], budgets: [], snapshot: null }));
+      const urlRoute = viewFromPathname();
+      const activeNav = route.page === 'app' && APP_VIEWS.includes(urlRoute.view)
+        ? urlRoute.view
+        : 'dashboard';
+      const ownerId = session.user.id;
+      const aiMessages = route.page === 'app'
+        ? loadCopilotFromSession(route.persona || 'Salaried employee', route.fullName || '', ownerId)
+        : [];
+      setState(s => ({
+        ...s,
+        ...route,
+        activeNav: route.page === 'app' ? activeNav : s.activeNav,
+        authInitializing: false,
+        authLoading: false,
+        transactions: [],
+        budgets: [],
+        snapshot: null,
+        aiMessages,
+        aiInputVal: '',
+        aiTyping: false,
+      }));
+      if (route.page) syncUrl(route.page, route.page === 'app' ? activeNav : 'dashboard');
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -113,12 +167,50 @@ export function AppProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    if (state.authInitializing) return;
+    const urlRoute = viewFromPathname();
+    if (state.page !== 'app' && urlRoute.page === 'app') return;
+    syncUrl(state.page, state.activeNav);
+  }, [state.page, state.activeNav, state.authInitializing]);
+
+  useEffect(() => {
+    storeShowAI(state.showAI);
+  }, [state.showAI]);
+
+  useEffect(() => {
+    function onPopState() {
+      const urlRoute = viewFromPathname();
+      if (urlRoute.page !== 'app') return;
+      const s = stateRef.current;
+      if (s.page !== 'app') return;
+      up({ activeNav: urlRoute.view || 'dashboard' });
+    }
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [up]);
+
+  useEffect(() => {
+    return watchSystemTheme(() => {
+      if (stateRef.current.settings?.theme === 'system') applyTheme('system');
+    });
+  }, []);
+
+  useEffect(() => {
     if (state.page === 'app' && (state.user || state.isDemoMode)) {
       refreshAppData();
-      const welcome = loadCopilotFromSession(state.persona, state.fullName);
-      up({ aiMessages: welcome });
+      if (!state.aiMessages.length) {
+        const ownerId = copilotOwnerId(state);
+        up({ aiMessages: loadCopilotFromSession(state.persona, state.fullName, ownerId) });
+      }
     }
   }, [state.page, state.user, state.isDemoMode, refreshAppData, up]);
+
+  function setActiveNav(activeNav) {
+    if (stateRef.current.page === 'app') {
+      syncUrl('app', activeNav, { replace: false });
+    }
+    up({ activeNav });
+  }
 
   function goTo(page, extra = {}) {
     setState(s => {
@@ -132,7 +224,90 @@ export function AppProvider({ children }) {
 
   function updateSettings(patch) {
     const next = saveSettings(patch);
-    up({ settings: next });
+    const statePatch = { settings: next };
+    if ('openAssistant' in patch) statePatch.showAI = next.openAssistant !== false;
+    up(statePatch);
+  }
+
+  function resetAppSettings() {
+    const next = resetSettings();
+    up({ settings: next, showAI: next.openAssistant !== false });
+  }
+
+  async function updateProfile(patch = {}) {
+    const s = stateRef.current;
+    const nextQuestionnaire = patch.questionnaire
+      ? { ...s.questionnaire, ...patch.questionnaire }
+      : s.questionnaire;
+    const statePatch = {};
+
+    if (patch.fullName != null) {
+      statePatch.fullName = patch.fullName.trim() || s.fullName;
+      statePatch.avatarInitials = initialsFromName(statePatch.fullName);
+    }
+    if (patch.persona != null) statePatch.persona = patch.persona;
+    if (patch.questionnaire) statePatch.questionnaire = nextQuestionnaire;
+
+    up(statePatch);
+
+    if (s.isDemoMode) {
+      saveFeature('demo', 'profile', {
+        fullName: statePatch.fullName ?? s.fullName,
+        persona: statePatch.persona ?? s.persona,
+        questionnaire: nextQuestionnaire,
+      });
+      return;
+    }
+
+    if (!s.user) return;
+
+    const dbPatch = {};
+    if (patch.fullName != null) {
+      dbPatch.full_name = statePatch.fullName ?? s.fullName;
+      dbPatch.avatar_initials = statePatch.avatarInitials ?? s.avatarInitials;
+    }
+    if (patch.persona != null) {
+      dbPatch.persona = PERSONA_LABEL_TO_DB[patch.persona] || 'salaried_employee';
+    }
+    if (patch.questionnaire) {
+      dbPatch.mcq_answers = nextQuestionnaire;
+    }
+
+    if (Object.keys(dbPatch).length) {
+      const { error } = await supabase.from('profiles').update(dbPatch).eq('id', s.user.id);
+      if (error) throw error;
+    }
+  }
+
+  function clearAssistantChat() {
+    const s = stateRef.current;
+    const msgs = freshCopilotMessages(s.persona, s.fullName);
+    up({ aiMessages: msgs, aiInputVal: '', aiTyping: false });
+    saveCopilotToSession(msgs, copilotOwnerId(s));
+  }
+
+  function exportUserData() {
+    const s = stateRef.current;
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      profile: {
+        fullName: s.fullName,
+        persona: s.persona,
+        email: s.user?.email || null,
+        isDemoMode: s.isDemoMode,
+      },
+      questionnaire: s.questionnaire,
+      transactions: s.transactions,
+      budgets: s.budgets,
+      snapshot: s.snapshot,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `finsight-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   function setSidebarWidth(w) {
@@ -158,13 +333,14 @@ export function AppProvider({ children }) {
     const { user, questionnaire } = stateRef.current;
     const personaLabel = questionnaire.persona || stateRef.current.persona;
     const personaDb = PERSONA_LABEL_TO_DB[personaLabel] || 'salaried_employee';
+    const welcome = freshCopilotMessages(personaLabel, stateRef.current.fullName);
     up({
       persona: personaLabel,
       page: 'app',
       activeNav: 'dashboard',
-      aiMessages: loadCopilotFromSession(personaLabel, stateRef.current.fullName),
+      aiMessages: welcome,
     });
-    saveCopilotToSession(loadCopilotFromSession(personaLabel, stateRef.current.fullName));
+    saveCopilotToSession(welcome, copilotOwnerId(stateRef.current));
     if (user) {
       await completeOnboarding(user.id, personaLabel);
       await supabase.from('profiles').update({
@@ -183,13 +359,13 @@ export function AppProvider({ children }) {
   async function sendAIMessage(text) {
     const txt = text || stateRef.current.aiInputVal;
     if (!txt?.trim()) return;
+    const ownerId = copilotOwnerId(stateRef.current);
     if (stateRef.current.isDemoMode) {
       const msgs = [...stateRef.current.aiMessages, { role:'user', text: txt }];
       up({ aiMessages: msgs, aiInputVal: '', aiTyping: true });
       await new Promise(r => setTimeout(r, 450));
       const { reply, createdTx, tx } = getLocalCopilotResponse(txt, stateRef.current.snapshot);
       const patch = { aiMessages: [...msgs, { role:'ai', text: reply }], aiTyping: false };
-      saveCopilotToSession(patch.aiMessages);
       if (createdTx && tx) {
         await recordTransaction({
           isDemoMode: true,
@@ -206,36 +382,57 @@ export function AppProvider({ children }) {
         });
         const msgs2 = [...msgs, { role: 'ai', text: reply }];
         up({ aiMessages: msgs2, aiTyping: false });
-        saveCopilotToSession(msgs2);
+        saveCopilotToSession(msgs2, ownerId);
         return;
       }
       up(patch);
+      saveCopilotToSession(patch.aiMessages, ownerId);
       return;
     }
     const msgs = [...stateRef.current.aiMessages, { role:'user', text: txt }];
     up({ aiMessages: msgs, aiInputVal: '', aiTyping: true });
     try {
       const { reply, snapshot, createdTx } = await sendCopilotMessage(txt, stateRef.current.snapshot);
-      up({ aiMessages: [...msgs, { role:'ai', text: reply }], aiTyping: false, snapshot: snapshot || stateRef.current.snapshot });
-      saveCopilotToSession([...msgs, { role:'ai', text: reply }]);
+      const nextMsgs = [...msgs, { role:'ai', text: reply }];
+      up({ aiMessages: nextMsgs, aiTyping: false, snapshot: snapshot || stateRef.current.snapshot });
+      saveCopilotToSession(nextMsgs, ownerId);
       if (createdTx) await refreshAppData();
     } catch (err) {
-      up({ aiMessages: [...msgs, { role:'ai', text: 'Sorry, something went wrong. Try again.' }], aiTyping: false });
-      saveCopilotToSession([...msgs, { role:'ai', text: 'Sorry, something went wrong. Try again.' }]);
+      const nextMsgs = [...msgs, { role:'ai', text: 'Sorry, something went wrong. Try again.' }];
+      up({ aiMessages: nextMsgs, aiTyping: false });
+      saveCopilotToSession(nextMsgs, ownerId);
     }
   }
 
   async function tryDemo() {
     if (stateRef.current.user) {
       signingOutRef.current = true;
+      clearCopilotSession();
       try { await signOut(); } catch { /* ok */ }
       signingOutRef.current = false;
     }
     demoModeRef.current = true;
+    clearCopilotSession();
     clearDemoSession();
+    const urlRoute = viewFromPathname();
+    const activeNav = APP_VIEWS.includes(urlRoute.view) ? urlRoute.view : 'dashboard';
     const demo = demoAppState();
-    up({ ...demo, budgets: [], transactions: [], snapshot: null });
-    up({ page: 'app' });
+    const savedProfile = loadFeature('demo', 'profile', null);
+    up({
+      ...demo,
+      budgets: [],
+      transactions: [],
+      snapshot: null,
+      activeNav,
+      page: 'app',
+      ...(savedProfile ? {
+        fullName: savedProfile.fullName || demo.fullName,
+        persona: savedProfile.persona || demo.persona,
+        questionnaire: savedProfile.questionnaire || {},
+        avatarInitials: initialsFromName(savedProfile.fullName || demo.fullName),
+      } : {}),
+    });
+    saveCopilotToSession(demo.aiMessages, 'demo');
     setTimeout(() => refreshAppData(), 0);
   }
 
@@ -262,12 +459,14 @@ export function AppProvider({ children }) {
   async function handleSignOut() {
     if (stateRef.current.isDemoMode) {
       demoModeRef.current = false;
+      clearCopilotSession();
       clearDemoSession();
       up({ ...emptyAuthState('landing'), transactions: [], budgets: [], snapshot: null });
       return;
     }
     signingOutRef.current = true;
     demoModeRef.current = false;
+    clearCopilotSession();
     try { await signOut(); } catch (err) { console.error(err); }
     finally { signingOutRef.current = false; }
     setState(s => ({ ...s, ...emptyAuthState('landing'), authInitializing: false, transactions: [], budgets: [], snapshot: null }));
@@ -295,9 +494,10 @@ export function AppProvider({ children }) {
   }
 
   const value = {
-    state, up, goTo, submitOnboardingStep, finishQuestionnaire, sendAIMessage,
+    state, up, goTo, setActiveNav, submitOnboardingStep, finishQuestionnaire, sendAIMessage,
     tryDemo, submitAuth, handleSignOut, refreshAppData, addTransaction, removeTransaction,
-    updateSettings, setSidebarWidth, setAiPanelWidth,
+    updateSettings, setSidebarWidth, setAiPanelWidth, resetAppSettings, updateProfile,
+    clearAssistantChat, exportUserData,
     getTxGroups: (search) => groupTransactions(stateRef.current.transactions, search),
   };
 

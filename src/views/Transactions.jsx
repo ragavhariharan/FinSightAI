@@ -81,7 +81,7 @@ export default function Transactions() {
   }
 
   const cards = [
-    { label: 'Account balance', value: accountBalance, format: (n) => formatRupee(n), color: 'var(--fs-brand)', icon: 'wallet', sub: def?.name || 'Add an account' },
+    { label: 'Account balance', value: accountBalance, format: (n) => formatRupee(n), color: 'var(--fs-success)', icon: 'wallet', sub: def?.name || 'Add an account' },
     { label: 'Income', value: summary.income, format: (n) => formatRupee(n, { signed: true }), color: 'var(--fs-success)', icon: 'income' },
     { label: 'Spending', value: summary.spend, format: (n) => formatRupee(n), color: 'var(--fs-text)', icon: 'transactions' },
     { label: 'Largest expense', value: summary.largest, format: (n) => formatRupee(n), color: 'var(--fs-text)', icon: 'alert' },
@@ -92,14 +92,41 @@ export default function Transactions() {
   return (
     <div className="fs-content-inner fs-view-enter">
       <div className="fs-tx-sticky">
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8, position: 'relative' }} ref={filterRef}>
+        <div className="fs-stat-grid" style={{ marginBottom: 16 }}>
+          {cards.map(({ label, value, format, color, icon, sub }, i) => (
+            <div key={label} className={`fs-card fs-stat-card fs-card-hover fs-animate-in fs-animate-in-delay-${Math.min(i + 1, 4)}`}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="fs-label">{label}</div>
+                <span style={{ color: 'var(--fs-text-muted)' }}><Icon name={icon} size={16} /></span>
+              </div>
+              <div className="fs-stat-value" style={{ color }}><AnimatedNumber value={value} format={format} /></div>
+              {sub && <div className="fs-subtitle" style={{ marginTop: 6, fontSize: '0.75rem' }}>{sub}</div>}
+            </div>
+          ))}
+        </div>
+
+        <div
+          className="fs-card"
+          ref={filterRef}
+          style={{ marginBottom: 12, padding: '10px 10px 10px 16px', display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}
+        >
+          <span style={{ color: 'var(--fs-text-muted)', flexShrink: 0 }}><Icon name="search" size={18} /></span>
+          <input
+            className="fs-input fs-input-sm"
+            value={txSearch}
+            onChange={e => up({ txSearch: e.target.value })}
+            placeholder="Search by name or category…"
+            style={{ border: 'none', background: 'transparent', padding: '8px 0', flex: 1, minWidth: 0 }}
+          />
           <button
+            type="button"
             className={`fs-btn fs-btn-ghost fs-btn-icon ${activeFilterCount ? 'fs-filter-active' : ''}`}
             onClick={() => setFiltersOpen(o => !o)}
             title="Filters"
-            style={{ width: 36, height: 36 }}
+            aria-expanded={filtersOpen}
+            style={{ width: 36, height: 36, flexShrink: 0, position: 'relative' }}
           >
-            <Icon name="settings" size={18} />
+            <Icon name="filter" size={18} />
             {activeFilterCount > 0 && <span className="fs-filter-dot" />}
           </button>
           {filtersOpen && (
@@ -124,30 +151,6 @@ export default function Transactions() {
               </label>
             </div>
           )}
-        </div>
-
-        <div className="fs-stat-grid" style={{ marginBottom: 16 }}>
-          {cards.map(({ label, value, format, color, icon, sub }, i) => (
-            <div key={label} className={`fs-card fs-stat-card fs-card-hover fs-animate-in fs-animate-in-delay-${Math.min(i + 1, 4)}`}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="fs-label">{label}</div>
-                <span style={{ color: 'var(--fs-text-muted)' }}><Icon name={icon} size={16} /></span>
-              </div>
-              <div className="fs-stat-value" style={{ color }}><AnimatedNumber value={value} format={format} /></div>
-              {sub && <div className="fs-subtitle" style={{ marginTop: 6, fontSize: '0.75rem' }}>{sub}</div>}
-            </div>
-          ))}
-        </div>
-
-        <div className="fs-card" style={{ marginBottom: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ color: 'var(--fs-text-muted)', flexShrink: 0 }}><Icon name="search" size={18} /></span>
-          <input
-            className="fs-input fs-input-sm"
-            value={txSearch}
-            onChange={e => up({ txSearch: e.target.value })}
-            placeholder="Search by name or category…"
-            style={{ border: 'none', background: 'transparent', padding: '8px 0', flex: 1 }}
-          />
         </div>
 
         <div className="fs-tab-group fs-tab-group-full" style={{ marginBottom: 14 }}>

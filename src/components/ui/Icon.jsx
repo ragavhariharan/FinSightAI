@@ -13,6 +13,7 @@ const PATHS = {
 
   // ── UI / actions ──
   search: (<><circle cx="11" cy="11" r="7.5" /><path d="m21 21-4.3-4.3" /></>),
+  filter: (<><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" /></>),
   plus: (<><path d="M12 5v14M5 12h14" /></>),
   close: (<><path d="M18 6 6 18M6 6l12 12" /></>),
   trash: (<><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></>),
@@ -25,6 +26,11 @@ const PATHS = {
   chevronRight: (<><path d="m9 6 6 6-6 6" /></>),
   chevronDown: (<><path d="m6 9 6 6 6-6" /></>),
   menu: (<><path d="M4 6h16M4 12h16M4 18h16" /></>),
+  eye: (<><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></>),
+  eyeOff: (<><path d="M9.9 4.24A10.7 10.7 0 0 1 12 4c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19" /><path d="M6.12 6.12A13.8 13.8 0 0 0 2 12s3.5 7 10 7a9.8 9.8 0 0 0 5.07-1.41" /><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" /><path d="M1 1l22 22" /></>),
+  monitor: (<><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></>),
+  sun: (<><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></>),
+  moon: (<><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></>),
   alert: (<><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><path d="M12 9v4M12 17h.01" /></>),
   upload: (<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5" /><path d="M12 3v12" /></>),
   shield: (<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></>),
@@ -64,16 +70,38 @@ const PATHS = {
   refresh: (<><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>),
 };
 
-export default function Icon({ name, size = 18, stroke = 1.7, className, style }) {
-  const content = PATHS[name] || PATHS.other;
+/** Solid filled shapes for category / accent icons */
+const FILLED_PATHS = {
+  income: <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7zm8 3.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6z" />,
+  housing: <path d="M12 2.6 2.5 11.2H6v10.8h12V11.2h3.5L12 2.6zM10 20.2v-5.4h4v5.4H10z" />,
+  food: <><path d="M6.5 2v9.2a2.5 2.5 0 0 0 5 0V2h-5z" /><path d="M15.5 2h2.5v9.2h2.5v2.2h-2.5v9.6h-2.5V2z" /></>,
+  groceries: <path d="M7.1 20.3a2 2 0 1 1-.1-4 2 2 0 0 1 .1 4zm9.8 0a2 2 0 1 1-.1-4 2 2 0 0 1 .1 4zM2.5 3.5h3.2l2.4 11.5c.2.8.9 1.4 1.7 1.4h9c.8 0 1.5-.6 1.7-1.4l2.2-8.3H7.1" />,
+  transport: <path d="M5.2 11.5 6.8 6h10.4l1.6 5.5H5.2zm-1.4 1.5h16.4a1 1 0 0 1 1 1v2.2a2.3 2.3 0 0 1-2.3 2.3h-1a2.3 2.3 0 0 1-2.3-2.3H9.5a2.3 2.3 0 0 1-2.3 2.3h-1A2.3 2.3 0 0 1 4 16.2v-2.2a1 1 0 0 1 1-1z" />,
+  shopping: <path d="M6.5 3 4 7.2v13.3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.2L17.5 3H6.5zm3.3 4.8a3.2 3.2 0 0 0 6.4 0H9.8z" />,
+  utilities: <path d="M13.2 2.2 3.8 14.5h7.1l-1 7.3 10.1-13.5h-7.1l.3-6.1z" />,
+  insurance: <path d="M12 2.4 4 6.2v6.1c0 5.4 3.4 9.2 8 11.3 4.6-2.1 8-5.9 8-11.3V6.2L12 2.4z" />,
+  entertainment: <path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h13A2.5 2.5 0 0 1 21 5.5v13A2.5 2.5 0 0 1 18.5 21h-13A2.5 2.5 0 0 1 3 18.5V5.5zm8 4.3 7 4-7 4V9.8z" />,
+  health: <path d="M12 21.5s-7.5-4.6-7.5-10.5C4.5 7.6 7.6 4.5 12 4.5s7.5 3.1 7.5 6.5S12 21.5 12 21.5z" />,
+  fitness: <path d="M2 10.5h4.5l2-3.5 2.8 2.8L14 6.3l2.7 2.7 2-3.5H22v3h-4l-2 3.5-2.7-2.7-4.7 3.5-2.8-2.8-2 3.5H2v-3z" />,
+  business: <path d="M6 4.5A2.5 2.5 0 0 1 8.5 2h7A2.5 2.5 0 0 1 18 4.5V8h2.5A1.5 1.5 0 0 1 22 9.5v11a1.5 1.5 0 0 1-1.5 1.5h-17A1.5 1.5 0 0 1 2 20.5v-11A1.5 1.5 0 0 1 3.5 8H6V4.5z" />,
+  savings: <path d="M4 21.5h16v-2H4v2zm1.5-4h2.8V10h3.5v7.5h2.8V10h3.5v7.5h2.9V8.5L12 3 5.5 8.5V17.5z" />,
+  other: <path d="M12.1 2.8a2.5 2.5 0 0 0-2.1 1.2L4.2 4.5A2 2 0 0 0 2.5 6.8v7.3c0 .7.3 1.4.8 1.9l7.1 7.1a2.4 2.4 0 0 0 3.4 0l7.1-7.1c.5-.5.8-1.2.8-1.9V6.8a2 2 0 0 0-1.7-2.3l-5.8-.5zm-.6 5.7a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6z" />,
+  goals: <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 4.5a5.5 5.5 0 1 1-5.5 5.5A5.5 5.5 0 0 1 12 6.5z" />,
+  alert: <path d="M12 2.2 1.8 19.5a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L12 2.2zm0 12.3a1.4 1.4 0 1 1-1.4-1.4 1.4 1.4 0 0 1 1.4 1.4zm-1.1-6h2.2l-.3 7H10.2l-.3-7z" />,
+};
+
+export default function Icon({ name, size = 18, stroke = 1.7, filled = false, className, style }) {
+  const content = filled
+    ? (FILLED_PATHS[name] || FILLED_PATHS.other)
+    : (PATHS[name] || PATHS.other);
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={stroke}
+      fill={filled ? 'currentColor' : 'none'}
+      stroke={filled ? 'none' : 'currentColor'}
+      strokeWidth={filled ? 0 : stroke}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}

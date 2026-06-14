@@ -1,3 +1,5 @@
+import { chartColor } from './chartColors';
+
 export function formatRupee(n, { signed = false } = {}) {
   const val = Number(n) || 0;
   const str = '₹' + Math.abs(val).toLocaleString('en-IN');
@@ -26,21 +28,24 @@ export function gaugeFromScore(score) {
   const cx = 60, cy = 60, r = 46;
   const circ = 2 * Math.PI * r;
   const offset = circ * (1 - s / 100);
-  const color = s >= 70 ? '#34D399' : s >= 50 ? '#FBBF24' : '#FB7185';
+  const color = s >= 70 ? '#62D492' : s >= 50 ? '#D97706' : '#C53030';
   return { score: s, color, circumference: circ.toFixed(1), dashOffset: offset.toFixed(1), transform: `rotate(-90 ${cx} ${cy})` };
 }
 
 export function forecastPathsFromPoints(points) {
   const raw = Array.isArray(points) && points.length ? points.map(Number) : [0];
-  const w = 560, h = 110, pad = 6;
-  const max = Math.max(...raw, 1) + 1200;
+  const w = 560, h = 110, pad = 8;
+  const min = Math.min(...raw, 0);
+  const max = Math.max(...raw, 1);
+  const range = max - min || 1;
   const pts = raw.map((d, i) => ({
     x: (i / Math.max(raw.length - 1, 1)) * w,
-    y: h - pad - (d / max) * (h - pad * 2),
+    y: h - pad - ((d - min) / range) * (h - pad * 2),
+    value: d,
   }));
-  const line = pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(0) + ' ' + p.y.toFixed(0)).join(' ');
-  const area = line + ' L ' + w + ' ' + h + ' L 0 ' + h + ' Z';
-  return { line, area };
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join(' ');
+  const area = line + ` L ${w} ${h} L 0 ${h} Z`;
+  return { line, area, pts, min, max };
 }
 
 export function donutPathsFromSegments(segments) {
@@ -49,7 +54,7 @@ export function donutPathsFromSegments(segments) {
   const total = cats.reduce((s, c) => s + c.amount, 0);
   const cx = 100, cy = 100, R = 78, r = 50;
   let a = -Math.PI / 2;
-  return cats.map(c => {
+  return cats.map((c, i) => {
     const da = (c.amount / total) * 2 * Math.PI;
     const ea = a + da;
     const g = 0.022;
@@ -63,6 +68,7 @@ export function donutPathsFromSegments(segments) {
     a = ea;
     return {
       ...c,
+      color: chartColor(i),
       d,
       pct: ((c.amount / total) * 100).toFixed(1),
       totalStr: formatRupee(c.amount),

@@ -39,7 +39,7 @@ export default function Accounts() {
     <div className="fs-content-inner fs-view-enter">
       <div className="fs-card fs-card-padded fs-animate-in" style={{ marginBottom: 18 }}>
         <div className="fs-label">Total across accounts</div>
-        <div style={{ fontFamily: "'Sora', sans-serif", fontSize: '2rem', fontWeight: 700, marginTop: 8 }}>{formatRupee(total)}</div>
+        <div className="fs-metric fs-metric-xl" style={{ marginTop: 8 }}>{formatRupee(total)}</div>
         <p className="fs-subtitle" style={{ marginTop: 8 }}>Balances update when you log income or expenses from an account.</p>
       </div>
 

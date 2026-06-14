@@ -1,6 +1,8 @@
 import { useApp } from '../context';
+import { ASSISTANT_NAME } from '../lib/assistant';
 import Logo from '../components/ui/Logo';
 import Icon from '../components/ui/Icon';
+import PasswordInput from '../components/ui/PasswordInput';
 import { signInWithGoogle } from '../lib/auth';
 
 function GoogleIcon() {
@@ -13,6 +15,13 @@ function GoogleIcon() {
     </svg>
   );
 }
+
+const BENEFITS = [
+  { icon: 'message', text: 'Log transactions by typing naturally — no forms to fill out' },
+  { icon: 'trendUp', text: 'Real-time dashboard with health score, budgets, and forecasts' },
+  { icon: 'shield', text: 'Your data stays private with encrypted storage and access controls' },
+  { icon: 'users', text: 'Onboarding tailored to students, salaried, gig, and business profiles' },
+];
 
 export default function Auth() {
   const { state, up, goTo, tryDemo, submitAuth } = useApp();
@@ -29,65 +38,109 @@ export default function Auth() {
   }
 
   return (
-    <div className="fs-auth-center">
-      <div className="fs-auth-card">
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 26 }}>
+    <div className="fs-auth-page">
+      <div className="fs-auth-visual">
+        <div className="fs-auth-visual-content">
           <Logo showText size={32} />
+          <h2 style={{ marginTop: 48 }}>
+            {isSignup ? 'Take control of your finances today' : 'Welcome back to FinSight'}
+          </h2>
+          <p className="fs-subtitle" style={{ maxWidth: 380 }}>
+            {isSignup
+              ? 'Join thousands of Indians who track spending, hit savings goals, and get AI-powered insights — all in one place.'
+              : `Your dashboard, budgets, and ${ASSISTANT_NAME} are ready. Sign in to pick up where you left off.`}
+          </p>
+          <div className="fs-auth-benefits">
+            {BENEFITS.map(b => (
+              <div key={b.text} className="fs-auth-benefit">
+                <div className="fs-auth-benefit-icon"><Icon name={b.icon} size={16} /></div>
+                <span>{b.text}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <h1 className="fs-h2" style={{ textAlign: 'center', marginBottom: 6 }}>
-          {isSignup ? 'Create your account' : 'Welcome back'}
-        </h1>
-        <p className="fs-subtitle" style={{ textAlign: 'center', marginBottom: 26 }}>
-          {isSignup ? 'Start understanding your finances in minutes' : 'Sign in to continue'}
-        </p>
-
-        <div className="fs-tab-group">
-          <button className={`fs-tab ${isSignup ? 'active' : ''}`} onClick={() => up({ authMode: 'signup' })}>Create account</button>
-          <button className={`fs-tab ${!isSignup ? 'active' : ''}`} onClick={() => up({ authMode: 'login' })}>Sign in</button>
-        </div>
-
-        <form onSubmit={submitAuth}>
-          {isSignup && (
-            <div className="fs-field">
-              <label className="fs-field-label">Full name</label>
-              <input className="fs-input" value={authName} onChange={e => up({ authName: e.target.value })} placeholder="Arjun Kumar" />
+        <div className="fs-auth-preview">
+          <div className="fs-label" style={{ marginBottom: 10, color: 'var(--fs-brand)' }}>{ASSISTANT_NAME}</div>
+          <div className="fs-chat-row fs-chat-row-user" style={{ marginBottom: 10 }}>
+            <div className="fs-chat-bubble fs-chat-bubble-user fs-chat-pos-solo" style={{ fontSize: '0.78rem' }}>
+              How much did I spend on food this week?
             </div>
-          )}
-          <div className="fs-field">
-            <label className="fs-field-label">Email</label>
-            <input className="fs-input" type="email" value={authEmail} onChange={e => up({ authEmail: e.target.value })} placeholder="you@email.com" />
           </div>
-          <div className="fs-field">
-            <label className="fs-field-label">Password</label>
-            <input className="fs-input" type="password" value={authPassword} onChange={e => up({ authPassword: e.target.value })} placeholder="At least 8 characters" />
+          <div className="fs-chat-row">
+            <div className="fs-chat-bubble fs-chat-bubble-ai fs-chat-pos-solo" style={{ fontSize: '0.78rem' }}>
+              You spent ₹3,240 on food across 8 transactions. That is 68% of your weekly food budget.
+            </div>
           </div>
-          {authError && (
-            <p style={{ fontSize: '0.8125rem', color: 'var(--fs-danger)', marginBottom: 14, textAlign: 'center', lineHeight: 1.5, padding: '10px 12px', background: 'var(--fs-danger-soft)', borderRadius: 'var(--fs-radius-sm)', border: '1px solid #FECDCA' }}>{authError}</p>
-          )}
-          <button type="submit" className="fs-btn fs-btn-primary" style={{ width: '100%', marginBottom: 12 }} disabled={authLoading}>
-            {authLoading ? 'Please wait…' : isSignup ? 'Create account' : 'Sign in'}
-          </button>
-        </form>
-
-        <button className="fs-btn fs-btn-secondary" style={{ width: '100%', marginBottom: 12 }} onClick={handleGoogle}>
-          <GoogleIcon /> Continue with Google
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0 12px' }}>
-          <div style={{ flex: 1, height: 1, background: 'var(--fs-border)' }} />
-          <span className="fs-subtitle" style={{ fontSize: '0.75rem' }}>or</span>
-          <div style={{ flex: 1, height: 1, background: 'var(--fs-border)' }} />
         </div>
+      </div>
 
-        <button className="fs-btn fs-btn-secondary" style={{ width: '100%' }} onClick={tryDemo}>
-          Continue as demo user
-        </button>
-
-        <div style={{ textAlign: 'center', marginTop: 20 }}>
-          <button className="fs-btn fs-btn-ghost fs-btn-sm" onClick={() => goTo('landing')} style={{ gap: 6 }}>
+      <div className="fs-auth-form-side">
+        <div className="fs-auth-card">
+          <button className="fs-btn fs-btn-ghost fs-btn-sm fs-auth-back" onClick={() => goTo('landing')}>
             <Icon name="arrowLeft" size={15} /> Back to home
           </button>
+
+          <h1 className="fs-h2" style={{ marginBottom: 6 }}>
+            {isSignup ? 'Create your account' : 'Sign in'}
+          </h1>
+          <p className="fs-subtitle" style={{ marginBottom: 26, fontSize: '0.875rem' }}>
+            {isSignup ? 'Free forever. No credit card required.' : 'Enter your credentials to continue'}
+          </p>
+
+          <form onSubmit={submitAuth}>
+            {isSignup && (
+              <div className="fs-field">
+                <label className="fs-field-label">Full name</label>
+                <input className="fs-input" value={authName} onChange={e => up({ authName: e.target.value })} placeholder="Arjun Kumar" autoComplete="name" />
+              </div>
+            )}
+            <div className="fs-field">
+              <label className="fs-field-label">Email</label>
+              <input className="fs-input" type="email" value={authEmail} onChange={e => up({ authEmail: e.target.value })} placeholder="you@email.com" autoComplete="email" />
+            </div>
+            <div className="fs-field">
+              <label className="fs-field-label">Password</label>
+              <PasswordInput
+                value={authPassword}
+                onChange={e => up({ authPassword: e.target.value })}
+                placeholder="At least 8 characters"
+                autoComplete={isSignup ? 'new-password' : 'current-password'}
+              />
+            </div>
+            {authError && (
+              <p style={{ fontSize: '0.8125rem', color: 'var(--fs-danger)', marginBottom: 14, textAlign: 'center', lineHeight: 1.5, padding: '10px 12px', background: 'var(--fs-danger-soft)', borderRadius: 'var(--fs-radius-sm)', border: '1px solid rgba(248, 113, 113, 0.2)' }}>{authError}</p>
+            )}
+            <button type="submit" className="fs-btn fs-btn-primary" style={{ width: '100%', marginBottom: 16, padding: '12px' }} disabled={authLoading}>
+              {authLoading ? 'Please wait…' : isSignup ? 'Create account' : 'Sign in'}
+            </button>
+          </form>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 0 16px' }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--fs-border)' }} />
+            <span className="fs-subtitle" style={{ fontSize: '0.75rem' }}>or</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--fs-border)' }} />
+          </div>
+
+          <button className="fs-btn fs-btn-secondary" style={{ width: '100%', marginBottom: 12 }} onClick={handleGoogle}>
+            <GoogleIcon /> Continue with Google
+          </button>
+
+          <button className="fs-btn fs-btn-ghost" style={{ width: '100%', fontSize: '0.8125rem' }} onClick={tryDemo}>
+            Continue as demo user
+          </button>
+
+          <p className="fs-auth-switch" style={{ textAlign: 'center', marginTop: 24, fontSize: '0.875rem', color: 'var(--fs-text-secondary)' }}>
+            {isSignup ? (
+              <>Already have an account?{' '}
+                <button type="button" className="fs-auth-switch-link" onClick={() => up({ authMode: 'login', authError: '' })}>Sign in</button>
+              </>
+            ) : (
+              <>Don&apos;t have an account?{' '}
+                <button type="button" className="fs-auth-switch-link" onClick={() => up({ authMode: 'signup', authError: '' })}>Create one</button>
+              </>
+            )}
+          </p>
         </div>
       </div>
     </div>

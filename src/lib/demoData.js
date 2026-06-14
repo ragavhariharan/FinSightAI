@@ -1,4 +1,4 @@
-import { categoryMeta } from './categories';
+import { chartColor } from './chartColors';
 
 /** Demo mode mock data — budgets/templates only; transactions are never seeded */
 export const DEMO_BUDGETS = [
@@ -36,7 +36,7 @@ export const DEMO_SNAPSHOT = {
     { name: 'Shopping', amount: 5698, pct: 12.0 },
     { name: 'Transport', amount: 5400, pct: 11.4 },
     { name: 'Utilities', amount: 9099, pct: 19.1 },
-  ].map(s => ({ ...s, color: categoryMeta(s.name).color })),
+  ].map((s, i) => ({ ...s, color: chartColor(i) })),
   transaction_count: 13,
   largest_expense: 22000,
 };
@@ -70,12 +70,12 @@ export const DEMO_NET_WORTH = {
 };
 
 export const DEMO_NEWS_POOL = [
-  { id: 'n1', title: 'Petrol prices rise ₹2.50/litre in metros', summary: 'OMCs revised fuel rates after crude uptick — impacts daily commuters.', source: 'Economic Times', tags: ['fuel', 'transport'], date: '2025-06-13', image: 'https://images.unsplash.com/photo-1633945274309-2c16c9682a8e?w=600&h=600&fit=crop' },
-  { id: 'n2', title: 'HDFC Bank Q4 net profit up 8% YoY', summary: 'Asset quality stable; NIM compression in focus for investors.', source: 'Mint', tags: ['HDFCBANK', 'banking'], date: '2025-06-12', image: 'https://images.unsplash.com/photo-1541354328608-1b8a2f0c81c8?w=600&h=600&fit=crop' },
-  { id: 'n3', title: 'SBI announces revised home loan rates', summary: 'Starting 8.50% for salaried — may affect your EMI planning.', source: 'Business Standard', tags: ['SBIN', 'housing', 'banking'], date: '2025-06-11', image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&h=600&fit=crop' },
-  { id: 'n4', title: 'SEBI tightens mutual fund expense ratio norms', summary: 'Direct plans may see lower TER — relevant for long-term SIP investors.', source: 'Moneycontrol', tags: ['mutualfunds', 'investing'], date: '2025-06-10', image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&h=600&fit=crop' },
-  { id: 'n5', title: 'Food delivery apps hike platform fees', summary: 'Swiggy and Zomato adjust fees in select cities.', source: 'Inc42', tags: ['food', 'shopping'], date: '2025-06-09', image: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?w=600&h=600&fit=crop' },
-  { id: 'n6', title: 'New tax regime slabs unchanged in Budget', summary: 'Old vs new regime choice remains key for salaried taxpayers.', source: 'Livemint', tags: ['tax', 'salaried'], date: '2025-06-08', image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&h=600&fit=crop' },
+  { id: 'n1', title: 'Petrol prices rise ₹2.50/litre in metros', summary: 'OMCs revised fuel rates after crude uptick — impacts daily commuters and transport budgets.', source: 'Economic Times', tags: ['fuel', 'transport'], date: '2025-06-13', link: 'https://economictimes.indiatimes.com', image: 'https://images.unsplash.com/photo-1633945274309-2c16c9682a8e?w=800&h=450&fit=crop' },
+  { id: 'n2', title: 'HDFC Bank Q4 net profit up 8% YoY', summary: 'Asset quality stable; NIM compression in focus for investors tracking private banks.', source: 'Mint', tags: ['HDFCBANK', 'banking'], date: '2025-06-12', link: 'https://www.livemint.com', image: 'https://images.unsplash.com/photo-1541354328608-1b8a2f0c81c8?w=800&h=450&fit=crop' },
+  { id: 'n3', title: 'SBI announces revised home loan rates', summary: 'Starting 8.50% for salaried borrowers — may affect your EMI planning this quarter.', source: 'Business Standard', tags: ['SBIN', 'housing', 'banking'], date: '2025-06-11', link: 'https://www.business-standard.com', image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&h=450&fit=crop' },
+  { id: 'n4', title: 'SEBI tightens mutual fund expense ratio norms', summary: 'Direct plans may see lower TER — relevant for long-term SIP investors.', source: 'Moneycontrol', tags: ['mutualfunds', 'investing'], date: '2025-06-10', link: 'https://www.moneycontrol.com', image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=450&fit=crop' },
+  { id: 'n5', title: 'Food delivery apps hike platform fees', summary: 'Swiggy and Zomato adjust fees in select cities — watch your food spend category.', source: 'Inc42', tags: ['food', 'shopping'], date: '2025-06-09', link: 'https://inc42.com', image: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?w=800&h=450&fit=crop' },
+  { id: 'n6', title: 'New tax regime slabs unchanged in Budget', summary: 'Old vs new regime choice remains key for salaried taxpayers planning FY deductions.', source: 'Livemint', tags: ['tax', 'salaried'], date: '2025-06-08', link: 'https://www.livemint.com', image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&h=450&fit=crop' },
 ];
 
 export const DEMO_BILL_SPLITS = [

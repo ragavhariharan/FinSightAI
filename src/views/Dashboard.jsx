@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useApp } from '../context';
+import { ASSISTANT_NAME } from '../lib/assistant';
 import { gaugeFromScore, forecastPathsFromPoints, formatRupee, currentMonthLabel } from '../lib/format';
 import { buildBriefing, dashboardSubtitle } from '../lib/briefing';
-import { categoryMeta } from '../lib/categories';
+import { chartColor } from '../lib/chartColors';
 import { sortTransactionsDesc } from '../lib/snapshot';
 import { userTransactionsOnly } from '../lib/format';
 import AnimatedNumber from '../components/ui/AnimatedNumber';
@@ -48,7 +49,7 @@ function HealthRing({ score }) {
         />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontFamily: "'Sora', sans-serif", fontSize: '1.85rem', fontWeight: 700, color: g.color, lineHeight: 1 }}>
+        <div className="fs-metric fs-metric-lg" style={{ color: g.color, lineHeight: 1 }}>
           <AnimatedNumber value={g.score} format={(n) => Math.round(n)} />
         </div>
         <div className="fs-label" style={{ marginTop: 3 }}>Health</div>
@@ -57,13 +58,15 @@ function HealthRing({ score }) {
   );
 }
 
-const DNA_COLORS = ['var(--fs-info)', 'var(--fs-success)', 'var(--fs-warning)', 'var(--fs-brand)', '#8B5CF6', '#EC4899'];
-
 export default function Dashboard() {
-  const { state, up } = useApp();
+  const { state, up, setActiveNav } = useApp();
   const { snapshot, fullName, dataLoading, transactions, questionnaire } = state;
   const snap = snapshot || {};
   const forecast = useMemo(() => forecastPathsFromPoints(snap.forecast?.points), [snap.forecast]);
+  const today = new Date().getDate();
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const todayLineX = ((Math.min(today, daysInMonth) - 1) / Math.max(daysInMonth - 1, 1)) * 560;
+  const mtdSavings = snap.net_savings ?? forecast.pts?.[today - 1]?.value ?? 0;
   const categoryDna = useMemo(() => (snap.donut_segments || []).slice(0, 6), [snap.donut_segments]);
   const leaks = snap.leaks || [];
   const briefing = useMemo(() => buildBriefing(snap, questionnaire || {}), [snap, questionnaire]);
@@ -135,7 +138,7 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               {categoryDna.map((seg, i) => {
-                const color = seg.color || categoryMeta(seg.name).color || DNA_COLORS[i % DNA_COLORS.length];
+                const color = chartColor(i);
                 return (
                   <div key={seg.name}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
@@ -154,27 +157,36 @@ export default function Dashboard() {
         </div>
 
         <div className="fs-card fs-card-padded">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <div className="fs-label">Savings forecast</div>
-            <span className="fs-badge fs-badge-success"><span className="fs-badge-dot" />Live</span>
+          <div className="fs-label" style={{ marginBottom: 6 }}>Savings forecast</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>
+            <div className="fs-metric fs-metric-lg">
+              <AnimatedNumber value={mtdSavings} format={(n) => formatRupee(n)} />{' '}
+              <span style={{ fontSize: '0.8125rem', fontWeight: 400, color: 'var(--fs-text-secondary)' }}>saved so far</span>
+            </div>
+            <div style={{ fontSize: '0.8125rem', color: 'var(--fs-text-secondary)' }}>
+              Projected <strong style={{ color: 'var(--fs-text)' }}>{formatRupee(snap.forecast?.projected_savings || snap.net_savings || 0)}</strong> by month end
+            </div>
           </div>
-          <div style={{ fontFamily: "'Sora', sans-serif", fontSize: '1.65rem', fontWeight: 700, marginBottom: 18, letterSpacing: '-0.025em' }}>
-            <AnimatedNumber value={snap.forecast?.projected_savings || snap.net_savings || 0} format={(n) => formatRupee(n)} />{' '}
-            <span style={{ fontSize: '0.8125rem', fontFamily: "'DM Sans', sans-serif", fontWeight: 500, color: 'var(--fs-text-secondary)' }}>projected</span>
-          </div>
-          <svg viewBox="0 0 560 120" style={{ width: '100%', height: 120 }} preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="fgr" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--fs-brand)" stopOpacity="0.16" />
-                <stop offset="100%" stopColor="var(--fs-brand)" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d={forecast.area} fill="url(#fgr)" style={{ animation: 'fs-fade-in 1.2s ease 0.3s both' }} />
+          <p className="fs-subtitle" style={{ fontSize: '0.72rem', marginBottom: 12 }}>
+            Solid line = cumulative savings from your transactions · shaded tail = run-rate projection
+          </p>
+          <svg viewBox="0 0 560 120" style={{ width: '100%', height: 120 }} preserveAspectRatio="none" role="img" aria-label="Monthly savings chart">
+            <line x1="0" y1="112" x2="560" y2="112" stroke="var(--fs-border)" strokeWidth="1" />
+            <line x1={todayLineX} y1="4" x2={todayLineX} y2="112" stroke="var(--fs-border-strong)" strokeWidth="1" strokeDasharray="4 4" />
+            <path d={forecast.area} fill="var(--fs-info-soft)" style={{ animation: 'fs-fade-in 1.2s ease 0.3s both' }} />
             <path
-              d={forecast.line} fill="none" stroke="var(--fs-brand)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+              d={forecast.line} fill="none" stroke="var(--fs-chart-blue)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
               style={{ strokeDasharray: 1600, strokeDashoffset: 1600, animation: 'fs-draw 1.6s var(--fs-ease) 0.2s forwards' }}
             />
+            {(forecast.pts || []).filter((_, i) => i < today).map((p, i) => (
+              <circle key={i} cx={p.x} cy={p.y} r="3.2" fill="var(--fs-chart-blue)" stroke="var(--fs-surface-solid)" strokeWidth="1.5" />
+            ))}
           </svg>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: '0.68rem', color: 'var(--fs-text-muted)' }}>
+            <span>Day 1</span>
+            <span>Today (day {today})</span>
+            <span>Day {daysInMonth}</span>
+          </div>
         </div>
       </div>
 
@@ -188,9 +200,7 @@ export default function Dashboard() {
             {leaks.map((leak, i) => (
               <div key={i} className="fs-animate-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--fs-surface-2)', borderRadius: 12, border: '1px solid var(--fs-border)', animationDelay: `${0.1 + i * 0.06}s` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--fs-brand-soft)', color: 'var(--fs-brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Icon name="alert" size={18} />
-                  </div>
+                  <Icon name="alert" size={20} style={{ color: 'var(--fs-warning)', flexShrink: 0 }} />
                   <div>
                     <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{leak.title}</div>
                     <div className="fs-subtitle" style={{ fontSize: '0.75rem' }}>{leak.detail}</div>
@@ -207,7 +217,7 @@ export default function Dashboard() {
         <div className="fs-card fs-animate-in fs-animate-in-delay-4" style={{ overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--fs-border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="fs-h3">Recent activity</div>
-            <button className="fs-btn fs-btn-ghost fs-btn-sm" onClick={() => up({ activeNav: 'transactions' })} style={{ gap: 5 }}>
+            <button className="fs-btn fs-btn-ghost fs-btn-sm" onClick={() => setActiveNav('transactions')} style={{ gap: 5 }}>
               View all <Icon name="chevronRight" size={14} />
             </button>
           </div>
@@ -226,10 +236,10 @@ export default function Dashboard() {
 
       {empty && (
         <EmptyState
-          icon="sparkle"
+          icon="message"
           title="Your dashboard is ready"
-          description="Log your first transaction manually, upload a CSV during onboarding, or tell the AI Copilot something like “I spent ₹500 on groceries”."
-          action={<button className="fs-btn fs-btn-primary" onClick={() => up({ showAI: true })}>Open AI Copilot</button>}
+          description={`Log your first transaction manually, upload a CSV during onboarding, or tell ${ASSISTANT_NAME} something like “I spent ₹500 on groceries”.`}
+          action={<button className="fs-btn fs-btn-primary" onClick={() => up({ showAI: true })}>Open {ASSISTANT_NAME}</button>}
         />
       )}
     </div>

@@ -1,9 +1,36 @@
-import { categoryMeta } from './categories';
+import { chartColor } from './chartColors';
 
 function inCurrentMonth(txnDate) {
   const d = new Date(txnDate);
   const now = new Date();
   return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+
+/** Cumulative month-to-date savings with run-rate projection for remaining days */
+export function buildSavingsForecastPoints(monthTx, today, daysInMonth, projectedTotal) {
+  const dailyNet = {};
+  monthTx.forEach(t => {
+    const d = new Date(`${t.txn_date}T12:00:00`).getDate();
+    dailyNet[d] = (dailyNet[d] || 0) + Number(t.amount);
+  });
+
+  const points = [];
+  let cumulative = 0;
+  const safeToday = Math.max(1, today);
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    if (d <= today) {
+      cumulative += dailyNet[d] || 0;
+      points.push(Math.round(cumulative));
+    } else {
+      const netSoFar = points[today - 1] ?? cumulative;
+      const remaining = daysInMonth - safeToday;
+      const step = remaining > 0 ? (projectedTotal - netSoFar) / remaining : 0;
+      points.push(Math.round(netSoFar + step * (d - safeToday)));
+    }
+  }
+
+  return points;
 }
 
 export function recomputeBudgetsFromTransactions(transactions, budgets = []) {
@@ -29,11 +56,11 @@ export function recomputeSnapshotFromTransactions(transactions = [], budgets = [
   const totalCat = Object.values(catMap).reduce((s, v) => s + v, 0) || 1;
   const donut_segments = Object.entries(catMap)
     .sort((a, b) => b[1] - a[1])
-    .map(([name, amount]) => ({
+    .map(([name, amount], i) => ({
       name,
       amount,
       pct: Math.round((amount / totalCat) * 1000) / 10,
-      color: categoryMeta(name).color,
+      color: chartColor(i),
     }));
 
   const updatedBudgets = recomputeBudgetsFromTransactions(transactions, budgets);
@@ -44,7 +71,7 @@ export function recomputeSnapshotFromTransactions(transactions = [], budgets = [
   const day = new Date().getDate();
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const projected = day > 0 ? Math.round((net / day) * daysInMonth) : net;
-  const points = Array.from({ length: 30 }, (_, i) => Math.round((projected / 29) * i));
+  const points = buildSavingsForecastPoints(monthTx, day, daysInMonth, projected);
 
   const expenses = monthTx.filter(t => t.amount < 0);
   const largest = expenses.length ? Math.max(...expenses.map(t => Math.abs(t.amount))) : 0;

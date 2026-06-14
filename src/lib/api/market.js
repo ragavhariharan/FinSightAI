@@ -24,8 +24,12 @@ export async function searchMutualFunds(query) {
   return data?.matches || [];
 }
 
-export async function refreshNewsFeed(force = false) {
-  const { data, error } = await supabase.functions.invoke('news-feed', { body: { refresh: force } });
+export async function refreshNewsFeed(force = false, options = {}) {
+  const { rotation = 0, excludeTitles = [] } = options;
+  const { data, error } = await supabase.functions.invoke('news-feed', {
+    body: { refresh: force, rotation, excludeTitles },
+  });
   if (error) throw error;
+  if (data?.error) throw new Error(data.error);
   return data?.items || [];
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context';
+import { ASSISTANT_NAME } from '../lib/assistant';
 import { visibleNav, PAGE_META } from '../lib/nav';
+import { readStoredShowAI } from '../lib/appRoute';
 import Logo from '../components/ui/Logo';
 import Icon from '../components/ui/Icon';
 import ResizeHandle from '../components/ResizeHandle';
@@ -39,18 +41,27 @@ function ViewContent({ nav }) {
   }
 }
 
+function formatDate() {
+  return new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
 export default function AppShell() {
-  const { state, up, handleSignOut, refreshAppData, setSidebarWidth, setAiPanelWidth, updateSettings } = useApp();
-  const { activeNav, showAI, persona, fullName, avatarInitials, isDemoMode, settings } = state;
+  const { state, up, setActiveNav, handleSignOut, refreshAppData, setSidebarWidth, setAiPanelWidth, updateSettings } = useApp();
+  const { activeNav, showAI, persona, fullName, isDemoMode, settings } = state;
   const [showAddTx, setShowAddTx] = useState(false);
   const collapsed = settings.sidebarCollapsed;
   const sections = visibleNav(settings);
   const meta = PAGE_META[activeNav] || PAGE_META.dashboard;
 
   useEffect(() => {
+    if (readStoredShowAI() !== null) return;
+    if (settings.openAssistant !== false) up({ showAI: true });
+  }, [settings.openAssistant, up]);
+
+  useEffect(() => {
     const allowed = sections.flatMap(s => s.items.map(i => i.id));
-    if (!allowed.includes(activeNav)) up({ activeNav: 'dashboard' });
-  }, [sections, activeNav, up]);
+    if (!allowed.includes(activeNav)) setActiveNav('dashboard');
+  }, [sections, activeNav, setActiveNav]);
 
   function toggleSidebar() {
     updateSettings({ sidebarCollapsed: !collapsed });
@@ -61,26 +72,26 @@ export default function AppShell() {
       <AddTransactionModal open={showAddTx} onClose={() => setShowAddTx(false)} onSaved={refreshAppData} />
 
       <aside className={`fs-sidebar fs-sidebar-resizable ${collapsed ? 'collapsed' : ''}`}>
-        <div style={{ padding: collapsed ? '20px 12px 14px' : '20px 20px 14px', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', gap: 8 }}>
-          {!collapsed && <Logo showText size={28} />}
+        <div style={{ padding: collapsed ? '20px 12px 14px' : '20px 16px 14px', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', gap: 8 }}>
+          {!collapsed && <Logo showText size={26} />}
           <button className="fs-btn fs-btn-ghost fs-btn-icon" onClick={toggleSidebar} title="Toggle menu" style={{ width: 34, height: 34 }}>
             <Icon name="menu" size={18} />
           </button>
         </div>
 
-        <nav style={{ flex: 1, padding: collapsed ? '6px 8px' : '6px 14px', overflowY: 'auto' }}>
+        <nav style={{ flex: 1, padding: collapsed ? '6px 8px' : '6px 12px', overflowY: 'auto' }}>
           {sections.map(section => (
             <div key={section.label}>
-              {!collapsed && <div className="fs-label" style={{ padding: '8px 12px 6px' }}>{section.label}</div>}
+              {!collapsed && <div className="fs-label" style={{ padding: '10px 12px 6px' }}>{section.label}</div>}
               {section.items.map(item => (
                 <button
                   key={item.id}
                   className={`fs-nav-item ${activeNav === item.id ? 'active' : ''}`}
-                  onClick={() => up({ activeNav: item.id })}
+                  onClick={() => setActiveNav(item.id)}
                   title={collapsed ? item.label : undefined}
                 >
                   <Icon name={item.icon} size={18} stroke={activeNav === item.id ? 2 : 1.7} />
-                  {!collapsed && item.label}
+                  {!collapsed && <span>{item.label}</span>}
                 </button>
               ))}
             </div>
@@ -88,15 +99,14 @@ export default function AppShell() {
         </nav>
 
         {!collapsed && (
-          <div style={{ borderTop: '1px solid var(--fs-border)', padding: '14px 16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--fs-brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}>{avatarInitials || 'U'}</div>
+          <div style={{ padding: '12px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.8125rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName || 'User'}</div>
-                <div className="fs-subtitle" style={{ fontSize: '0.6875rem' }}>{persona}</div>
+                <div style={{ fontSize: '0.8125rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName || 'User'}</div>
+                <div className="fs-subtitle" style={{ fontSize: '0.6875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{persona}</div>
               </div>
-              <button className="fs-btn fs-btn-ghost fs-btn-icon" onClick={handleSignOut} title={isDemoMode ? 'Exit demo' : 'Sign out'} style={{ width: 34, height: 34 }}>
-                <Icon name="logout" size={17} />
+              <button className="fs-btn fs-btn-ghost fs-btn-icon" onClick={() => setActiveNav('settings')} title="Settings" style={{ width: 34, height: 34, flexShrink: 0 }}>
+                <Icon name="settings" size={17} />
               </button>
             </div>
           </div>
@@ -111,13 +121,13 @@ export default function AppShell() {
         <header className="fs-topbar">
           <div>
             <h1 className="fs-page-title">{meta.title}</h1>
-            <div className="fs-subtitle" style={{ fontSize: '0.75rem' }}>{meta.subtitle}</div>
+            <div className="fs-subtitle" style={{ fontSize: '0.75rem' }}>{activeNav === 'dashboard' ? formatDate() : meta.subtitle}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {isDemoMode && <span className="fs-badge fs-badge-muted">Demo mode</span>}
             <button className={`fs-btn fs-btn-ai fs-btn-sm ${showAI ? 'active' : ''}`} onClick={() => up({ showAI: !showAI })}>
-              <Icon name="sparkle" size={15} />
-              AI Copilot
+              <Icon name="message" size={15} />
+              {ASSISTANT_NAME}
             </button>
           </div>
         </header>
@@ -129,7 +139,7 @@ export default function AppShell() {
 
       {showAI && (
         <div className="fs-ai-wrap">
-          <ResizeHandle edge="left" width={settings.aiPanelWidth} onResize={setAiPanelWidth} min={280} max={520} />
+          <ResizeHandle edge="left" width={settings.aiPanelWidth} onResize={setAiPanelWidth} min={300} max={520} />
           <AISidebar />
         </div>
       )}

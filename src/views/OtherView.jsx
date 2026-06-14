@@ -1,4 +1,5 @@
 import { useApp } from '../context';
+import { ASSISTANT_NAME } from '../lib/assistant';
 
 const PAGE_TITLES = { recurring:'Recurring', goals:'Goals' };
 
@@ -12,7 +13,7 @@ export default function OtherView() {
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9H22L16 13.5L18.5 21L12 16.5L5.5 21L8 13.5L2 9H9.5Z" stroke="#C8C8C0" strokeWidth="1.5" /></svg>
       </div>
       <h3 style={{ fontSize:18, fontWeight:700, marginBottom:8 }}>{title} coming soon</h3>
-      <p style={{ fontSize:14, color:'#9B9B9F', maxWidth:320, lineHeight:1.6 }}>This feature is under development. Ask your AI Copilot about it in the meantime.</p>
+      <p style={{ fontSize:14, color:'var(--fs-text-secondary)', maxWidth:320, lineHeight:1.6 }}>This feature is under development. Ask {ASSISTANT_NAME} about it in the meantime.</p>
     </div>
   );
 }

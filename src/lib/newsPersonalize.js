@@ -14,10 +14,8 @@ export function getPersonalizedNews(transactions = [], stocks = [], pool = DEMO_
 
   const scored = pool.map(item => ({
     ...item,
-    score: (item.tags || []).filter(t => tags.has(t)).length,
+    score: (item.tags || []).filter(t => tags.has(t)).length + (item.imageFromFeed ? 3 : 0),
   }));
 
-  const relevant = scored.filter(item => item.score > 0);
-  const list = relevant.length ? relevant : scored;
-  return list.sort((a, b) => b.score - a.score || (b.date || '').localeCompare(a.date || ''));
+  return scored.sort((a, b) => b.score - a.score || (b.date || '').localeCompare(a.date || ''));
 }

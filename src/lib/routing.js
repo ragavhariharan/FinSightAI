@@ -1,4 +1,5 @@
 import { PERSONA_DB_TO_LABEL } from './supabase';
+import { ASSISTANT_NAME } from './assistant';
 
 /** Pages allowed when logged out */
 export const PUBLIC_PAGES = ['landing', 'auth'];
@@ -48,7 +49,6 @@ export function buildAppStateFromProfile(profile) {
     mcqAnswers: questionnaire,
     fullName: profile.full_name || 'User',
     avatarInitials: profile.avatar_initials || 'U',
-    activeNav: 'dashboard',
     isDemoMode: false,
     aiMessages: [],
   };
@@ -74,10 +74,9 @@ export function demoAppState() {
     persona: 'Salaried employee',
     fullName: 'Demo User',
     avatarInitials: 'DU',
-    activeNav: 'dashboard',
     aiMessages: [{
       role: 'ai',
-      text: "Welcome to FinSight demo! Your Salaried employee profile is loaded. Try asking 'what can I cut?' or type 'I spent ₹500 on groceries' to see the AI in action.",
+      text: `Welcome to FinSight demo! Your Salaried employee profile is loaded. Ask ${ASSISTANT_NAME} 'what can I cut?' or type 'I spent ₹500 on groceries' to see Kash in action.`,
     }],
   };
 }

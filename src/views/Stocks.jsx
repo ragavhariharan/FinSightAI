@@ -56,7 +56,7 @@ export default function Stocks() {
   return (
     <div className="fs-content-inner fs-view-enter">
       {summary.rows.length > 0 && (
-        <div className="fs-card fs-card-padded fs-card-accent fs-animate-in" style={{ marginBottom: 18 }}>
+        <div className="fs-card fs-card-padded fs-animate-in" style={{ marginBottom: 18, background: 'var(--fs-surface-2)' }}>
           <div className="fs-label" style={{ color: 'var(--fs-brand)', marginBottom: 8 }}>AI summary</div>
           <p style={{ fontSize: '0.9375rem', lineHeight: 1.6, margin: 0 }}>{portfolioSummaryText(summary)}</p>
         </div>

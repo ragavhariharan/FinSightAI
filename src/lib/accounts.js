@@ -1,8 +1,10 @@
 import { supabase } from './supabase';
 
+import { chartColor, CHART_PALETTE } from './chartColors';
+
 const DEMO_ACCOUNTS = [
-  { id: 'a1', name: 'HDFC Savings', institution: 'HDFC Bank', balance: 420000, is_default: true, color: '#1F7A5E' },
-  { id: 'a2', name: 'ICICI Credit', institution: 'ICICI Bank', balance: 42000, is_default: false, color: '#3E8EDE' },
+  { id: 'a1', name: 'HDFC Savings', institution: 'HDFC Bank', balance: 420000, is_default: true, color: chartColor(0) },
+  { id: 'a2', name: 'ICICI Credit', institution: 'ICICI Bank', balance: 42000, is_default: false, color: chartColor(1) },
 ];
 
 async function uid() {
@@ -11,30 +13,34 @@ async function uid() {
   return user.id;
 }
 
+function withChartColors(accounts) {
+  return (accounts || []).map((a, i) => ({ ...a, color: chartColor(i) }));
+}
+
 export async function fetchAccounts(isDemoMode) {
   if (isDemoMode) {
     try {
       const raw = localStorage.getItem('finsight_accounts_demo');
-      if (raw) return JSON.parse(raw);
+      if (raw) return withChartColors(JSON.parse(raw));
     } catch { /* ignore */ }
     return DEMO_ACCOUNTS.map(a => ({ ...a }));
   }
   const { data, error } = await supabase.from('bank_accounts').select('*').order('created_at');
   if (error) throw error;
-  return (data || []).map(r => ({
+  return withChartColors((data || []).map(r => ({
     id: String(r.id),
     name: r.name,
     institution: r.institution,
     balance: Number(r.balance),
     is_default: r.is_default,
-    color: r.color || '#1F7A5E',
-  }));
+    color: r.color,
+  })));
 }
 
-export const ACCOUNT_PALETTE = ['#1F7A5E', '#2A9D8F', '#3E8EDE', '#5B6CF0', '#7C5CBF', '#C45C8A', '#D97B35', '#4A5568'];
+export const ACCOUNT_PALETTE = CHART_PALETTE;
 
 export function paletteColor(index) {
-  return ACCOUNT_PALETTE[index % ACCOUNT_PALETTE.length];
+  return chartColor(index);
 }
 
 export async function saveAccountsDemo(accounts) {
@@ -100,7 +106,7 @@ export async function upsertAccount(isDemoMode, account) {
     institution: account.institution || null,
     balance: Number(account.balance) || 0,
     is_default: !!account.is_default,
-    color: account.color || '#1F7A5E',
+    color: account.color || chartColor(list.length),
   };
   if (account.id && !String(account.id).startsWith('a')) {
     const { error } = await supabase.from('bank_accounts').update(row).eq('id', Number(account.id));

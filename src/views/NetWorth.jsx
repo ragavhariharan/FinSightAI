@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { useApp } from '../context';
 import { useFeatureData } from '../hooks/useFeatureData';
 import { loadNetWorth } from '../lib/netWorth';
-import { fetchAccounts, totalBalance, paletteColor, ACCOUNT_PALETTE } from '../lib/accounts';
+import { fetchAccounts, totalBalance } from '../lib/accounts';
+import { chartColor } from '../lib/chartColors';
 import { loadHoldings, quoteHoldings } from '../lib/stocks';
 import { loadFunds, fundMetrics } from '../lib/mutualFunds';
 import { formatRupee, donutPathsFromSegments } from '../lib/format';
@@ -14,7 +15,7 @@ const loadNw = (isDemo, uid) => loadNetWorth(isDemo, uid);
 const loadAcc = (isDemo) => fetchAccounts(isDemo);
 
 export default function NetWorth() {
-  const { state, up } = useApp();
+  const { state, setActiveNav } = useApp();
   const { data, loading } = useFeatureData(loadNw, []);
   const { data: accounts, loading: accLoading } = useFeatureData(loadAcc, [state.transactions?.length]);
   const [stockValue, setStockValue] = useState(0);
@@ -45,7 +46,7 @@ export default function NetWorth() {
       name: a.name,
       amount: a.balance,
       pct: Math.round((a.balance / total) * 100),
-      color: a.color || paletteColor(i),
+      color: chartColor(i),
     }));
   }, [accounts, bankTotal]);
 
@@ -68,13 +69,13 @@ export default function NetWorth() {
           icon="networth"
           title="Track your net worth"
           description="Add bank accounts under Accounts — balances update automatically when you log transactions."
-          action={<button className="fs-btn fs-btn-primary" onClick={() => up({ activeNav: 'accounts' })}>Go to Accounts</button>}
+          action={<button className="fs-btn fs-btn-primary" onClick={() => setActiveNav('accounts')}>Go to Accounts</button>}
         />
       ) : (
         <>
           <div className="fs-card fs-card-padded fs-animate-in" style={{ marginBottom: 18, textAlign: 'center', padding: '36px 24px' }}>
             <div className="fs-label" style={{ marginBottom: 10 }}>Net worth</div>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: '2.8rem', fontWeight: 700, letterSpacing: '-0.03em', color: net >= 0 ? 'var(--fs-text)' : 'var(--fs-danger)' }}>
+            <div className="fs-metric fs-metric-xl" style={{ letterSpacing: '-0.025em', color: net >= 0 ? 'var(--fs-text)' : 'var(--fs-danger)' }}>
               <AnimatedNumber value={net} format={(n) => formatRupee(n)} />
             </div>
             <p className="fs-subtitle" style={{ marginTop: 10 }}>
@@ -90,12 +91,12 @@ export default function NetWorth() {
                   {piePaths.length > 0 && (
                     <svg width="120" height="120" viewBox="0 0 200 200" style={{ flexShrink: 0 }}>
                       {piePaths.map((seg, i) => (
-                        <path key={i} d={seg.d} fill={accountSegments[i]?.color || paletteColor(i)} />
+                        <path key={i} d={seg.d} fill={seg.color} />
                       ))}
                     </svg>
                   )}
                   <div style={{ flex: 1, minWidth: 160 }}>
-                    <div style={{ fontFamily: "'Sora', sans-serif", fontSize: '1.5rem', fontWeight: 700, marginBottom: 12 }}>
+                    <div className="fs-metric" style={{ fontSize: '1.5rem', marginBottom: 12 }}>
                       <AnimatedNumber value={bankTotal} format={(n) => formatRupee(n)} />
                     </div>
                     {accountSegments.map(seg => (
@@ -142,8 +143,8 @@ export default function NetWorth() {
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-                <button className="fs-btn fs-btn-secondary fs-btn-sm" onClick={() => up({ activeNav: 'stocks' })}>Stocks</button>
-                <button className="fs-btn fs-btn-secondary fs-btn-sm" onClick={() => up({ activeNav: 'mutualFunds' })}>Mutual funds</button>
+                <button className="fs-btn fs-btn-secondary fs-btn-sm" onClick={() => setActiveNav('stocks')}>Stocks</button>
+                <button className="fs-btn fs-btn-secondary fs-btn-sm" onClick={() => setActiveNav('mutualFunds')}>Mutual funds</button>
               </div>
             </div>
           </div>

@@ -81,17 +81,22 @@ export default function SpendingChallenges() {
                 const active = ch.status === 'active';
                 const done = ch.progress >= 100;
                 const onTrack = ch.progress >= 60;
+                const statusBadge = done
+                  ? { cls: 'fs-badge-success', label: 'Completed' }
+                  : onTrack
+                    ? { cls: 'fs-badge-brand', label: 'On track' }
+                    : { cls: 'fs-badge-warning', label: 'In progress' };
                 return (
-                  <div key={ch.id} className={`fs-card fs-card-padded fs-animate-in fs-animate-in-delay-${Math.min(i + 1, 4)}`} style={{ borderLeft: `4px solid ${done ? 'var(--fs-success)' : onTrack ? 'var(--fs-brand)' : 'var(--fs-warning)'}` }}>
+                  <div key={ch.id} className={`fs-card fs-card-padded fs-animate-in fs-animate-in-delay-${Math.min(i + 1, 4)}`}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
                       <div>
-                        <div className="fs-h3" style={{ fontSize: '0.95rem' }}>{ch.title}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div className="fs-h3" style={{ fontSize: '0.95rem' }}>{ch.title}</div>
+                          <span className={`fs-badge ${statusBadge.cls}`}>{statusBadge.label}</span>
+                        </div>
                         <div className="fs-subtitle" style={{ fontSize: '0.75rem' }}>{ch.desc}</div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        {done && <span className="fs-badge" style={{ background: 'var(--fs-success)', color: '#fff' }}>Done</span>}
-                        <button className={`fs-toggle ${active ? 'on' : ''}`} onClick={() => toggle(ch.id, ch.status)} aria-pressed={active} />
-                      </div>
+                      <button className={`fs-toggle ${active ? 'on' : ''}`} onClick={() => toggle(ch.id, ch.status)} aria-pressed={active} />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                       <div className="fs-progress-track" style={{ height: 10, flex: 1 }}>

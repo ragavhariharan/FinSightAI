@@ -35,7 +35,7 @@ export default function AddBudgetModal({ open, onClose, onSaved }) {
     <Modal open={open} onClose={onClose} title="Add budget category" subtitle="Set a monthly limit to track against">
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-          <CategoryIcon category={form.category} size={56} iconSize={26} />
+          <CategoryIcon category={form.category} size={28} />
         </div>
         <div className="fs-field">
           <label className="fs-field-label">Category</label>
