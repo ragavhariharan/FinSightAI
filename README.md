@@ -20,11 +20,20 @@
 </div>
 
 <p align="center">
-  <a href="#features">Features</a> ·
+  <a href="#about">About</a> ·
   <a href="#screenshot">Screenshot</a> ·
+  <a href="#features">Features</a> ·
   <a href="#architecture">Architecture</a> ·
-  <a href="#getting-started">Getting started</a>
+  <a href="#security">Security</a>
 </p>
+
+## About
+
+FinSight is a full-stack personal finance platform built for how people in India actually earn, spend, and save. Instead of a one-size-fits-all dashboard, the app adapts to your profile — student, salaried professional, or business owner — and tailors onboarding, default budgets, and insights accordingly.
+
+Log a transaction once and it flows everywhere: budgets update, reports refresh, and your financial health score recalculates. Ask **Kash**, the built-in AI copilot, questions in plain language or type *"I spent ₹500 on groceries"* — no forms required.
+
+**Try it:** open the app and select **Try live demo** for a full walkthrough with no account needed.
 
 ## Screenshot
 
@@ -32,11 +41,9 @@
   <img src="ss.png" alt="FinSight dashboard" width="92%" />
 </p>
 
-## Overview
-
-FinSight is persona-aware personal finance for India. Onboarding adapts to students, salaried professionals, and business owners; default budgets and dashboard framing follow that profile. Every transaction updates budgets server-side, recomputes the dashboard snapshot in PostgreSQL, and keeps **Kash** (the AI copilot) in sync with your real numbers.
-
-Open the app and use **Try live demo** for a full interactive session with no sign-up.
+<p align="center">
+  <sub>Dashboard with health score, monthly metrics, spending breakdown, savings forecast, and recent activity.</sub>
+</p>
 
 ## Features
 
@@ -44,63 +51,47 @@ Open the app and use **Try live demo** for a full interactive session with no si
 <tr>
 <td width="50%" valign="top">
 
-**Dashboard**
-- Financial health score (0–100) from savings rate and budget adherence
-- Monthly spend, net savings, and savings rate vs income
-- Personalized briefing, category breakdown, savings forecast
-- Leak detector for categories up 25%+ vs last month
-- Recent activity feed
+**Dashboard & insights**
+- Financial health score driven by savings rate and budget discipline
+- Monthly spend, net savings, and savings rate at a glance
+- Category breakdown, savings forecast, and spending leak detection
+- Persona-aware briefing that updates with every transaction
 
-**Transactions**
-- Manual entry via floating action button
-- Natural-language logging through Kash
-- Search, filter, sort; recurring pattern detection
-
-**Budgets**
-- Per-category monthly limits with progress bars
-- Persona-seeded defaults on onboarding complete
-- Overall usage warnings at 75% and 90%
-
-**Reports**
-- Income, expenses, savings rate, daily average
-- Category donut chart and top merchants
-- Spending alerts from leak detector
+**Money in & out**
+- Manual transaction entry or natural-language logging via Kash
+- Searchable ledger with filters, sorting, and recurring detection
+- Category budgets with progress bars and over-limit warnings
+- Reports with donut charts, top merchants, and monthly summaries
 
 </td>
 <td width="50%" valign="top">
 
-**Accounts & net worth**
-- Multiple bank accounts with default selector
-- Net worth across banks, stocks, mutual funds, assets, liabilities
+**Wealth & investments**
+- Bank accounts and consolidated net worth view
+- Stock portfolio with live NSE/BSE quotes
+- Mutual fund tracker with AMFI search, NAV, and returns
+- Savings goals, spending challenges, and recurring expense management
 
-**Recurring**
-- OTT/subscription presets and custom recurring items
-- Detection from transaction history
-
-**Investments**
-- Stocks: NSE/BSE holdings, live Yahoo Finance quotes
-- Mutual funds: AMFI search, NAV, XIRR, benchmark comparison
-
-**Goals & challenges**
-- Timeline-based savings targets with progress tracking
-- Gamified challenges with XP and preset goals
-
-**News**
-- Indian financial news (Mint, ET, Moneycontrol, Google News)
-- Personalized ranking from interests, spending, and holdings
-
-**Kash**
-- Resizable AI sidebar on every screen
-- Context-aware replies; creates transactions from chat
-- OpenRouter via edge function; local fallback in demo mode
-
-**Auth & settings**
-- Email/password and Google OAuth; RLS on all user data
-- Light/dark/system theme; toggle optional modules
+**Intelligence**
+- **Kash** — context-aware AI copilot across every screen
+- Personalized financial news from Indian sources
+- Onboarding questionnaire that seeds budgets to your profile
+- Light and dark themes; modular feature toggles in settings
 
 </td>
 </tr>
 </table>
+
+## Kash
+
+Kash is FinSight's AI assistant. It reads your current dashboard snapshot and recent transactions before every reply, so answers reflect your real finances — not generic advice.
+
+| Capability | Detail |
+|------------|--------|
+| Natural-language logging | *"Paid ₹299 for Spotify"* → categorized and saved automatically |
+| Spending questions | Ask about categories, savings pace, or where money is leaking |
+| Always available | Resizable sidebar panel on every view in the app |
+| Secure by design | AI runs server-side; API keys never reach the browser |
 
 ## Architecture
 
@@ -108,45 +99,24 @@ Open the app and use **Try live demo** for a full interactive session with no si
   <img src="docs/assets/architecture.png" width="100%" />
 </p>
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 18, Vite 6, light/dark themes |
-| Backend | Supabase Auth, PostgreSQL, RLS, Edge Functions |
-| AI | OpenRouter via `ai-copilot` and `ai-onboarding` |
-| Market data | Yahoo Finance (equities), AMFI NAV (mutual funds) |
-| News | LiveMint, Economic Times, Moneycontrol, Google News RSS |
+FinSight is a React single-page application backed by Supabase. User data lives in PostgreSQL with row-level security. Dashboard metrics are computed server-side and cached as snapshots, so the UI stays fast even as transaction history grows.
 
-Metrics are computed in PostgreSQL (`recompute_dashboard_snapshot`) and stored in `dashboard_snapshots`. Edge functions: `ai-copilot`, `ai-onboarding`, `market-data`, `news-feed`.
+| Layer | Stack |
+|-------|-------|
+| Client | React 18, Vite, responsive light/dark UI |
+| Backend | Supabase Auth, PostgreSQL, Edge Functions |
+| AI | Kash copilot and onboarding via OpenRouter |
+| Market data | Yahoo Finance (equities), AMFI India (mutual fund NAV) |
+| News | Curated RSS from Mint, Economic Times, Moneycontrol, Google News |
 
-## Getting started
+## Security
 
-**Prerequisites:** Node.js 18+, a [Supabase](https://supabase.com) project
+FinSight is built with data isolation as a default, not an afterthought.
 
-```bash
-npm install
-cp .env.example .env.local   # set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
-npm run dev
-```
-
-1. Apply `supabase/migrations/001` through `008` in order
-2. Deploy edge functions in `supabase/functions/`
-3. Set `OPENROUTER_API_KEY` (required) and `SUPABASE_SERVICE_ROLE_KEY` (recommended for news cache)
-
-Use **Try live demo** to explore without Supabase. For production: `npm run build` then `npm run preview`.
-
-## Project structure
-
-```
-src/           pages, views, components, lib, context
-supabase/      migrations, edge functions
-docs/assets/   README branding (logo, architecture PNG)
-```
-
-## Data and privacy
-
-- Row Level Security on all user tables (`auth.uid() = user_id`)
-- OpenRouter keys only in Edge Function secrets, never in the frontend bundle
-- Preferences in `localStorage`; Kash session in `sessionStorage`
+- Every user table is protected with PostgreSQL Row Level Security
+- Authentication via email/password or Google OAuth
+- AI and third-party API keys are stored in server-side secrets only
+- Financial data is scoped per user — no cross-account access
 
 <p align="center">
   <sub><strong>FinSight</strong> · built for how Indians earn, spend, and save</sub>
