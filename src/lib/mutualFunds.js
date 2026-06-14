@@ -1,24 +1,14 @@
-import { DEMO_MUTUAL_FUNDS } from './demoData';
-import { loadFeature, saveFeature } from './featureStore';
 import * as api from './api/features';
 import { fetchNavByIsin } from './api/market';
 
-export async function loadFunds(isDemoMode, userId) {
-  if (isDemoMode) return loadFeature('demo', 'mutual_funds', DEMO_MUTUAL_FUNDS);
-  if (!userId) return [];
+export async function loadFunds() {
   const funds = await api.fetchMutualFunds();
   return enrichFundsWithNav(funds);
 }
 
-export async function addFund(isDemoMode, userId, fund) {
-  if (isDemoMode) {
-    const current = loadFeature('demo', 'mutual_funds', DEMO_MUTUAL_FUNDS);
-    const next = [...current, fund];
-    saveFeature('demo', 'mutual_funds', next);
-    return next;
-  }
+export async function addFund(fund) {
   await api.insertMutualFund(fund);
-  return loadFunds(isDemoMode, userId);
+  return loadFunds();
 }
 
 async function enrichFundsWithNav(funds) {

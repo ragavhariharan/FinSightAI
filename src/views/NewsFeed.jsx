@@ -6,7 +6,7 @@ import { loadHoldings } from '../lib/stocks';
 import EmptyState from '../components/ui/EmptyState';
 import Icon from '../components/ui/Icon';
 
-const loadNews = (isDemo) => loadNewsPool(isDemo);
+const loadNews = () => loadNewsPool();
 const NEWS_LIMIT = 48;
 
 function NewsCardImage({ src, alt }) {
@@ -35,17 +35,17 @@ export default function NewsFeed() {
   const [stocks, setStocks] = useState([]);
 
   useEffect(() => {
-    loadHoldings(state.isDemoMode, state.user?.id).then(setStocks);
-  }, [state.isDemoMode, state.user?.id]);
+    loadHoldings().then(setStocks);
+  }, [state.user?.id]);
 
   useEffect(() => {
-    if (state.isDemoMode || loading) return;
+    if (loading) return;
     let cancelled = false;
     refreshNewsPoolInBackground(false).then((fresh) => {
       if (!cancelled && fresh?.length) setData(fresh);
     });
     return () => { cancelled = true; };
-  }, [state.isDemoMode, loading, setData]);
+  }, [loading, setData]);
 
   const items = useMemo(() => {
     if (!pool) return [];
@@ -57,7 +57,6 @@ export default function NewsFeed() {
     setRefreshError('');
     try {
       const fresh = await refreshNewsPoolInBackground(true, {
-        isDemoMode: state.isDemoMode,
         rotation: refreshEpoch + 1,
         excludeTitles: (pool || []).map((item) => item.title),
       });

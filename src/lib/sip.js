@@ -1,22 +1,12 @@
-import { DEMO_SIP_GOALS } from './demoData';
-import { loadFeature, saveFeature } from './featureStore';
 import * as api from './api/features';
 
-export async function loadSipGoals(isDemoMode, userId) {
-  if (isDemoMode) return loadFeature('demo', 'sip_goals', DEMO_SIP_GOALS);
-  if (!userId) return [];
+export async function loadSipGoals() {
   return api.fetchSipGoals();
 }
 
-export async function addSipGoal(isDemoMode, userId, goal) {
-  if (isDemoMode) {
-    const current = loadFeature('demo', 'sip_goals', DEMO_SIP_GOALS);
-    const next = [...current, goal];
-    saveFeature('demo', 'sip_goals', next);
-    return next;
-  }
+export async function addSipGoal(goal) {
   await api.insertSipGoal(goal);
-  return loadSipGoals(isDemoMode, userId);
+  return loadSipGoals();
 }
 
 export function requiredMonthlySip(target, years, annualReturn = 0.12) {

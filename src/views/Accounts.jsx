@@ -6,7 +6,7 @@ import { formatRupee } from '../lib/format';
 import EmptyState from '../components/ui/EmptyState';
 import Icon from '../components/ui/Icon';
 
-const load = (isDemo) => fetchAccounts(isDemo);
+const load = () => fetchAccounts();
 
 export default function Accounts() {
   const { state } = useApp();
@@ -18,7 +18,7 @@ export default function Accounts() {
   async function handleAdd(e) {
     e.preventDefault();
     if (!form.name) return;
-    const next = await upsertAccount(state.isDemoMode, {
+    const next = await upsertAccount({
       name: form.name,
       institution: form.institution,
       balance: Number(form.balance) || 0,
@@ -31,7 +31,7 @@ export default function Accounts() {
   }
 
   async function setDefault(id) {
-    const next = await setDefaultAccountOnly(state.isDemoMode, id);
+    const next = await setDefaultAccountOnly(id);
     setData(next);
   }
 

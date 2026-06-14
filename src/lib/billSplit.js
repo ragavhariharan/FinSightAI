@@ -1,22 +1,12 @@
-import { DEMO_BILL_SPLITS } from './demoData';
-import { loadFeature, saveFeature } from './featureStore';
 import * as api from './api/features';
 
-export async function loadBillSplits(isDemoMode, userId) {
-  if (isDemoMode) return loadFeature('demo', 'bill_splits', DEMO_BILL_SPLITS);
-  if (!userId) return [];
+export async function loadBillSplits() {
   return api.fetchBillSplits();
 }
 
-export async function saveBillSplitMembers(isDemoMode, userId, billId, members) {
-  if (isDemoMode) {
-    const splits = loadFeature('demo', 'bill_splits', DEMO_BILL_SPLITS);
-    const next = splits.map(b => b.id === billId ? { ...b, members } : b);
-    saveFeature('demo', 'bill_splits', next);
-    return next;
-  }
+export async function saveBillSplitMembers(billId, members) {
   await api.updateBillSplit(billId, members);
-  return loadBillSplits(isDemoMode, userId);
+  return loadBillSplits();
 }
 
 export function totalOwedToYou(splits, yourName = 'You') {

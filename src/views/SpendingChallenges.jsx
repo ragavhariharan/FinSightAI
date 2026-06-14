@@ -5,7 +5,7 @@ import { loadChallenges, toggleChallengeStatus, addChallenge, updateChallengePro
 import EmptyState from '../components/ui/EmptyState';
 import Icon from '../components/ui/Icon';
 
-const loadCh = (isDemo, uid) => loadChallenges(isDemo, uid);
+const loadCh = () => loadChallenges();
 
 const PRESETS = [
   { title: 'No-spend weekend', desc: 'Zero discretionary spend Sat–Sun', challenge_type: 'no_spend_weekend', target: 0, unit: '₹', icon: 'shield', xp: 100 },
@@ -31,12 +31,12 @@ export default function SpendingChallenges() {
 
   async function toggle(id, status) {
     const nextStatus = status === 'active' ? 'paused' : 'active';
-    const next = await toggleChallengeStatus(state.isDemoMode, state.user?.id, id, nextStatus);
+    const next = await toggleChallengeStatus(id, nextStatus);
     setData(next);
   }
 
   async function startPreset(preset) {
-    const next = await addChallenge(state.isDemoMode, state.user?.id, preset);
+    const next = await addChallenge(preset);
     setData(next);
   }
 

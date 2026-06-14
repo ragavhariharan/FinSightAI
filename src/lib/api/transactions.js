@@ -1,10 +1,10 @@
 import { supabase } from '../supabase';
 import { mapTransactionRow, userTransactionsOnly } from '../format';
 import { isPhantomTransaction } from '../phantomTransactions';
+import { requireAuthUser } from './auth';
 
 export async function purgePhantomTransactions() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return 0;
+  const user = await requireAuthUser();
 
   const { data, error } = await supabase
     .from('transactions')
@@ -23,9 +23,12 @@ export async function purgePhantomTransactions() {
 }
 
 export async function fetchTransactions() {
+  const user = await requireAuthUser();
+
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
+    .eq('user_id', user.id)
     .neq('source', 'seed')
     .order('txn_date', { ascending: false })
     .order('id', { ascending: false });
@@ -76,7 +79,8 @@ export async function bulkInsertTransactions(rows) {
 }
 
 export async function deleteTransaction(id) {
-  const { error } = await supabase.from('transactions').delete().eq('id', id);
+  const user = await requireAuthUser();
+  const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id);
   if (error) throw error;
 }
 

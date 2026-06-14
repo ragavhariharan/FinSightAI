@@ -1,40 +1,12 @@
 import * as api from './api/features';
-import { loadFeature, saveFeature } from './featureStore';
 
-const DEMO_GOALS = [
-  { id: 'emergency', title: 'Emergency fund', target: 100000, icon: 'shield', color: '#3E63DD' },
-  { id: 'savings', title: 'Monthly savings', target: 15000, icon: 'savings', color: '#1F7A5E' },
-];
-
-export async function loadGoals(isDemoMode, userId) {
-  if (isDemoMode) {
-    try {
-      const raw = localStorage.getItem(`finsight_goals_demo`);
-      if (raw) return JSON.parse(raw);
-    } catch { /* ignore */ }
-    return DEMO_GOALS.map(g => ({ ...g }));
-  }
-  if (!userId) return [];
+export async function loadGoals() {
   return api.fetchSavingsGoals();
 }
 
-export async function saveGoals(isDemoMode, userId, goals) {
-  if (isDemoMode) {
-    localStorage.setItem(`finsight_goals_demo`, JSON.stringify(goals));
-    return;
-  }
-  // Real users add goals individually via insertSavingsGoal
-}
-
-export async function addGoal(isDemoMode, userId, goal) {
-  if (isDemoMode) {
-    const current = await loadGoals(true, 'demo');
-    const next = [...current, goal];
-    localStorage.setItem('finsight_goals_demo', JSON.stringify(next));
-    return next;
-  }
+export async function addGoal(goal) {
   await api.insertSavingsGoal(goal);
-  return loadGoals(false, userId);
+  return loadGoals();
 }
 
 export function timelineToDays(value, unit = 'years') {

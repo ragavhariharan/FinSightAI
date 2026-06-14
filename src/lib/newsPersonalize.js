@@ -1,6 +1,4 @@
-import { DEMO_NEWS_POOL } from './demoData';
-
-export function getPersonalizedNews(transactions = [], stocks = [], pool = DEMO_NEWS_POOL, questionnaire = {}) {
+export function getPersonalizedNews(transactions = [], stocks = [], pool = [], questionnaire = {}) {
   const tags = new Set(['salaried', 'investing', 'tax']);
   const interests = questionnaire.news_interests || [];
   interests.forEach(i => tags.add(i));

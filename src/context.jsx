@@ -1,16 +1,15 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { signUpWithEmail, signInWithEmail, signOut, resolveSessionState } from './lib/auth';
 import { supabase, PERSONA_LABEL_TO_DB } from './lib/supabase';
-import { PUBLIC_PAGES, demoAppState, emptyAuthState } from './lib/routing';
-import { loadAppData, clearDemoSession } from './lib/data';
-import { sendCopilotMessage, getLocalCopilotResponse } from './lib/api/copilot';
+import { PUBLIC_PAGES, emptyAuthState } from './lib/routing';
+import { loadAppData } from './lib/data';
+import { sendCopilotMessage } from './lib/api/copilot';
 import { completeOnboarding } from './lib/api/onboarding';
 import { formatAuthError } from './lib/formatAuthError';
 import { loadSettings, saveSettings, resetSettings, applyTheme, applyLayoutWidths, watchSystemTheme, initialsFromName } from './lib/settings';
-import { saveFeature, loadFeature } from './lib/featureStore';
 import { ASSISTANT_NAME } from './lib/assistant';
 import { viewFromPathname, syncUrl, readStoredShowAI, storeShowAI, APP_VIEWS } from './lib/appRoute';
-import { groupTransactions, mapTransactionRow } from './lib/format';
+import { groupTransactions } from './lib/format';
 import { recordTransaction, undoTransaction } from './lib/transactionFlow';
 
 const COPILOT_SESSION_KEY = 'finsight_copilot_msgs';
@@ -21,8 +20,7 @@ function copilotWelcome(persona, fullName) {
   return `Hi${first ? ` ${first}` : ''}! I'm ${ASSISTANT_NAME}. Log a transaction or ask me anything about your ${persona || 'finances'}.`;
 }
 
-function copilotOwnerId({ user, isDemoMode }) {
-  if (isDemoMode) return 'demo';
+function copilotOwnerId(user) {
   return user?.id || null;
 }
 
@@ -66,43 +64,41 @@ export function AppProvider({ children }) {
     const urlRoute = typeof window !== 'undefined' ? viewFromPathname() : { page: 'landing', view: 'dashboard' };
     const storedShowAI = readStoredShowAI();
     return {
-    page: urlRoute.page === 'auth' ? 'auth' : 'landing',
-    authInitializing:true,
-    user:null,
-    fullName:'',
-    avatarInitials:'U',
-    authMode:'signup',
-    authEmail:'', authPassword:'', authName:'',
-    mcqStep:0, mcqAnswers:{}, persona:'Salaried employee',
-    onboardingStep: 0,
-    questionnaire: {},
-    activeNav: urlRoute.view || 'dashboard',
-    showAI: storedShowAI ?? false,
-    aiMessages:[], aiInputVal:'', aiTyping:false,
-    txSearch:'',
-    transactions:[],
-    budgets:[],
-    snapshot:null,
-    dataLoading:false,
-    authLoading:false,
-    authError:'',
-    isDemoMode:false,
-    settings,
-  };
+      page: urlRoute.page === 'auth' ? 'auth' : 'landing',
+      authInitializing: true,
+      user: null,
+      fullName: '',
+      avatarInitials: 'U',
+      authMode: 'signup',
+      authEmail: '', authPassword: '', authName: '',
+      mcqStep: 0, mcqAnswers: {}, persona: 'Salaried employee',
+      onboardingStep: 0,
+      questionnaire: {},
+      activeNav: urlRoute.view || 'dashboard',
+      showAI: storedShowAI ?? false,
+      aiMessages: [], aiInputVal: '', aiTyping: false,
+      txSearch: '',
+      transactions: [],
+      budgets: [],
+      snapshot: null,
+      dataLoading: false,
+      authLoading: false,
+      authError: '',
+      settings,
+    };
   });
 
   const up = useCallback((patch) => setState(s => ({ ...s, ...patch })), []);
   const signingOutRef = useRef(false);
-  const demoModeRef = useRef(false);
   const stateRef = useRef(state);
   stateRef.current = state;
 
   const refreshAppData = useCallback(async () => {
     const s = stateRef.current;
-    if (!s.user && !s.isDemoMode) return;
+    if (!s.user) return;
     up({ dataLoading: true });
     try {
-      const data = await loadAppData(s.isDemoMode);
+      const data = await loadAppData();
       up({ ...data, dataLoading: false });
     } catch (err) {
       console.error(err);
@@ -120,12 +116,7 @@ export function AppProvider({ children }) {
         window.history.replaceState(null, '', path);
       }
       if (signingOutRef.current && session) return;
-      if (!session && demoModeRef.current) {
-        setState(s => ({ ...s, authInitializing: false }));
-        return;
-      }
       if (!session) {
-        demoModeRef.current = false;
         clearCopilotSession();
         const urlRoute = viewFromPathname();
         const page = urlRoute.page === 'auth' ? 'auth' : 'landing';
@@ -133,7 +124,6 @@ export function AppProvider({ children }) {
         syncUrl(page, 'dashboard');
         return;
       }
-      demoModeRef.current = false;
       const route = await resolveSessionState(session);
       if (!mounted || signingOutRef.current) return;
       const urlRoute = viewFromPathname();
@@ -196,14 +186,14 @@ export function AppProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (state.page === 'app' && (state.user || state.isDemoMode)) {
+    if (state.page === 'app' && state.user) {
       refreshAppData();
       if (!state.aiMessages.length) {
-        const ownerId = copilotOwnerId(state);
+        const ownerId = copilotOwnerId(state.user);
         up({ aiMessages: loadCopilotFromSession(state.persona, state.fullName, ownerId) });
       }
     }
-  }, [state.page, state.user, state.isDemoMode, refreshAppData, up]);
+  }, [state.page, state.user, refreshAppData, up]);
 
   function setActiveNav(activeNav) {
     if (stateRef.current.page === 'app') {
@@ -215,7 +205,7 @@ export function AppProvider({ children }) {
   function goTo(page, extra = {}) {
     setState(s => {
       if (s.user && PUBLIC_PAGES.includes(page)) return s;
-      if (!s.user && !s.isDemoMode && !PUBLIC_PAGES.includes(page)) {
+      if (!s.user && !PUBLIC_PAGES.includes(page)) {
         return { ...s, page: 'auth', authMode: 'signup', ...extra };
       }
       return { ...s, page, ...extra };
@@ -249,16 +239,6 @@ export function AppProvider({ children }) {
     if (patch.questionnaire) statePatch.questionnaire = nextQuestionnaire;
 
     up(statePatch);
-
-    if (s.isDemoMode) {
-      saveFeature('demo', 'profile', {
-        fullName: statePatch.fullName ?? s.fullName,
-        persona: statePatch.persona ?? s.persona,
-        questionnaire: nextQuestionnaire,
-      });
-      return;
-    }
-
     if (!s.user) return;
 
     const dbPatch = {};
@@ -283,7 +263,7 @@ export function AppProvider({ children }) {
     const s = stateRef.current;
     const msgs = freshCopilotMessages(s.persona, s.fullName);
     up({ aiMessages: msgs, aiInputVal: '', aiTyping: false });
-    saveCopilotToSession(msgs, copilotOwnerId(s));
+    saveCopilotToSession(msgs, copilotOwnerId(s.user));
   }
 
   function exportUserData() {
@@ -294,7 +274,6 @@ export function AppProvider({ children }) {
         fullName: s.fullName,
         persona: s.persona,
         email: s.user?.email || null,
-        isDemoMode: s.isDemoMode,
       },
       questionnaire: s.questionnaire,
       transactions: s.transactions,
@@ -340,7 +319,7 @@ export function AppProvider({ children }) {
       activeNav: 'dashboard',
       aiMessages: welcome,
     });
-    saveCopilotToSession(welcome, copilotOwnerId(stateRef.current));
+    saveCopilotToSession(welcome, copilotOwnerId(user));
     if (user) {
       await completeOnboarding(user.id, personaLabel);
       await supabase.from('profiles').update({
@@ -352,94 +331,32 @@ export function AppProvider({ children }) {
     await refreshAppData();
   }
 
-  async function finishOnboarding(persona, answers) {
+  async function finishOnboarding() {
     finishQuestionnaire();
   }
 
   async function sendAIMessage(text) {
     const txt = text || stateRef.current.aiInputVal;
     if (!txt?.trim()) return;
-    const ownerId = copilotOwnerId(stateRef.current);
-    if (stateRef.current.isDemoMode) {
-      const msgs = [...stateRef.current.aiMessages, { role:'user', text: txt }];
-      up({ aiMessages: msgs, aiInputVal: '', aiTyping: true });
-      await new Promise(r => setTimeout(r, 450));
-      const { reply, createdTx, tx } = getLocalCopilotResponse(txt, stateRef.current.snapshot);
-      const patch = { aiMessages: [...msgs, { role:'ai', text: reply }], aiTyping: false };
-      if (createdTx && tx) {
-        await recordTransaction({
-          isDemoMode: true,
-          state: stateRef.current,
-          up,
-          payload: {
-            name: tx.name,
-            amount: tx.amount,
-            category: tx.category,
-            emoji: tx.emoji,
-            isRecurring: tx.isRecurring,
-            source: 'chat',
-          },
-        });
-        const msgs2 = [...msgs, { role: 'ai', text: reply }];
-        up({ aiMessages: msgs2, aiTyping: false });
-        saveCopilotToSession(msgs2, ownerId);
-        return;
-      }
-      up(patch);
-      saveCopilotToSession(patch.aiMessages, ownerId);
-      return;
-    }
-    const msgs = [...stateRef.current.aiMessages, { role:'user', text: txt }];
+    const ownerId = copilotOwnerId(stateRef.current.user);
+    const msgs = [...stateRef.current.aiMessages, { role: 'user', text: txt }];
     up({ aiMessages: msgs, aiInputVal: '', aiTyping: true });
     try {
       const { reply, snapshot, createdTx } = await sendCopilotMessage(txt, stateRef.current.snapshot);
-      const nextMsgs = [...msgs, { role:'ai', text: reply }];
+      const nextMsgs = [...msgs, { role: 'ai', text: reply }];
       up({ aiMessages: nextMsgs, aiTyping: false, snapshot: snapshot || stateRef.current.snapshot });
       saveCopilotToSession(nextMsgs, ownerId);
       if (createdTx) await refreshAppData();
-    } catch (err) {
-      const nextMsgs = [...msgs, { role:'ai', text: 'Sorry, something went wrong. Try again.' }];
+    } catch {
+      const nextMsgs = [...msgs, { role: 'ai', text: 'Sorry, something went wrong. Try again.' }];
       up({ aiMessages: nextMsgs, aiTyping: false });
       saveCopilotToSession(nextMsgs, ownerId);
     }
   }
 
-  async function tryDemo() {
-    if (stateRef.current.user) {
-      signingOutRef.current = true;
-      clearCopilotSession();
-      try { await signOut(); } catch { /* ok */ }
-      signingOutRef.current = false;
-    }
-    demoModeRef.current = true;
-    clearCopilotSession();
-    clearDemoSession();
-    const urlRoute = viewFromPathname();
-    const activeNav = APP_VIEWS.includes(urlRoute.view) ? urlRoute.view : 'dashboard';
-    const demo = demoAppState();
-    const savedProfile = loadFeature('demo', 'profile', null);
-    up({
-      ...demo,
-      budgets: [],
-      transactions: [],
-      snapshot: null,
-      activeNav,
-      page: 'app',
-      ...(savedProfile ? {
-        fullName: savedProfile.fullName || demo.fullName,
-        persona: savedProfile.persona || demo.persona,
-        questionnaire: savedProfile.questionnaire || {},
-        avatarInitials: initialsFromName(savedProfile.fullName || demo.fullName),
-      } : {}),
-    });
-    saveCopilotToSession(demo.aiMessages, 'demo');
-    setTimeout(() => refreshAppData(), 0);
-  }
-
   async function submitAuth(e) {
     e.preventDefault();
     const { authMode, authEmail, authPassword, authName } = stateRef.current;
-    demoModeRef.current = false;
     up({ authLoading: true, authError: '' });
     try {
       if (authMode === 'signup') {
@@ -457,15 +374,7 @@ export function AppProvider({ children }) {
   }
 
   async function handleSignOut() {
-    if (stateRef.current.isDemoMode) {
-      demoModeRef.current = false;
-      clearCopilotSession();
-      clearDemoSession();
-      up({ ...emptyAuthState('landing'), transactions: [], budgets: [], snapshot: null });
-      return;
-    }
     signingOutRef.current = true;
-    demoModeRef.current = false;
     clearCopilotSession();
     try { await signOut(); } catch (err) { console.error(err); }
     finally { signingOutRef.current = false; }
@@ -474,7 +383,6 @@ export function AppProvider({ children }) {
 
   async function addTransaction(payload) {
     return recordTransaction({
-      isDemoMode: stateRef.current.isDemoMode,
       state: stateRef.current,
       up,
       refreshAppData,
@@ -485,7 +393,6 @@ export function AppProvider({ children }) {
   async function removeTransaction(id) {
     const tx = stateRef.current.transactions.find(t => t.id === id);
     await undoTransaction({
-      isDemoMode: stateRef.current.isDemoMode,
       state: stateRef.current,
       up,
       refreshAppData,
@@ -495,7 +402,7 @@ export function AppProvider({ children }) {
 
   const value = {
     state, up, goTo, setActiveNav, submitOnboardingStep, finishQuestionnaire, sendAIMessage,
-    tryDemo, submitAuth, handleSignOut, refreshAppData, addTransaction, removeTransaction,
+    submitAuth, handleSignOut, refreshAppData, addTransaction, removeTransaction,
     updateSettings, setSidebarWidth, setAiPanelWidth, resetAppSettings, updateProfile,
     clearAssistantChat, exportUserData,
     getTxGroups: (search) => groupTransactions(stateRef.current.transactions, search),

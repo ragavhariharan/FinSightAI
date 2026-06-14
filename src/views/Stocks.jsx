@@ -6,7 +6,7 @@ import { formatRupee } from '../lib/format';
 import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
 
-const loadStocks = (isDemo, uid) => loadHoldings(isDemo, uid);
+const loadStocks = () => loadHoldings();
 
 export default function Stocks() {
   const { state } = useApp();
@@ -22,16 +22,16 @@ export default function Stocks() {
     }
     let cancelled = false;
     setQuotesLoading(true);
-    quoteHoldings(holdings, state.isDemoMode).then(s => {
+    quoteHoldings(holdings).then(s => {
       if (!cancelled) { setSummary(s); setQuotesLoading(false); }
     });
     return () => { cancelled = true; };
-  }, [holdings, state.isDemoMode]);
+  }, [holdings]);
 
   async function refresh() {
     if (!holdings) return;
     setQuotesLoading(true);
-    const s = await quoteHoldings(holdings, state.isDemoMode);
+    const s = await quoteHoldings(holdings);
     setSummary(s);
     setQuotesLoading(false);
   }
@@ -48,7 +48,7 @@ export default function Stocks() {
       avgPrice: Number(form.avgPrice) || 100,
       basePrice: Number(form.avgPrice) || 100,
     };
-    const next = await addHolding(state.isDemoMode, state.user?.id, holding);
+    const next = await addHolding(holding);
     setData(next);
     setForm({ symbol: '', name: '', qty: '', avgPrice: '' });
   }

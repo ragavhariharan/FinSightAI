@@ -7,7 +7,7 @@ import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
 import Select from '../components/ui/Select';
 
-const loadG = (isDemo, uid) => loadGoals(isDemo, uid);
+const loadG = () => loadGoals();
 
 export default function Goals() {
   const { state } = useApp();
@@ -31,7 +31,7 @@ export default function Goals() {
       icon: 'goals',
       color: '#1F7A5E',
     };
-    const next = await addGoal(state.isDemoMode, state.user?.id, goal);
+    const next = await addGoal(goal);
     setData(next);
     setForm({ title: '', target: '', timeline_value: 6, timeline_unit: 'months' });
     setShowAdd(false);

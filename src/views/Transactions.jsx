@@ -26,11 +26,11 @@ const SORT_OPTIONS = [
   { value: 'amount_asc', label: 'Amount: low to high' },
 ];
 
-const loadAcc = (isDemo) => fetchAccounts(isDemo);
+const loadAcc = () => fetchAccounts();
 
 export default function Transactions() {
   const { state, up, removeTransaction } = useApp();
-  const { txSearch, transactions, dataLoading, isDemoMode } = state;
+  const { txSearch, transactions, dataLoading } = state;
   const { data: accounts } = useFeatureData(loadAcc, [transactions.length]);
   const [typeFilter, setTypeFilter] = useState('all');
   const [period, setPeriod] = useState('month');

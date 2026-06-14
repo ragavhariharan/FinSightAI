@@ -6,7 +6,7 @@ import { searchMutualFunds } from '../lib/api/market';
 import { formatRupee } from '../lib/format';
 import EmptyState from '../components/ui/EmptyState';
 
-const loadMf = (isDemo, uid) => loadFunds(isDemo, uid);
+const loadMf = () => loadFunds();
 
 export default function MutualFunds() {
   const { state } = useApp();
@@ -37,7 +37,7 @@ export default function MutualFunds() {
       fundReturn: 12,
       navHistory: [],
     };
-    const next = await addFund(state.isDemoMode, state.user?.id, fund);
+    const next = await addFund(fund);
     setData(next);
     setForm({ query: '', units: '', invested: '' });
     setSelected(null);

@@ -1,34 +1,18 @@
-import { DEMO_CHALLENGES } from './demoData';
-import { loadFeature, saveFeature } from './featureStore';
 import * as api from './api/features';
 
-export async function loadChallenges(isDemoMode, userId) {
-  if (isDemoMode) return loadFeature('demo', 'challenges', DEMO_CHALLENGES);
-  if (!userId) return [];
+export async function loadChallenges() {
   return api.fetchChallenges();
 }
 
-export async function addChallenge(isDemoMode, userId, ch) {
-  if (isDemoMode) {
-    const items = loadFeature('demo', 'challenges', DEMO_CHALLENGES);
-    const next = [...items, { ...ch, id: `c${Date.now()}`, status: 'active', progress: 0, current: 0 }];
-    saveFeature('demo', 'challenges', next);
-    return next;
-  }
+export async function addChallenge(ch) {
   await api.insertChallenge(ch);
-  return loadChallenges(isDemoMode, userId);
+  return loadChallenges();
 }
 
-export async function toggleChallengeStatus(isDemoMode, userId, id, currentStatus) {
+export async function toggleChallengeStatus(id, currentStatus) {
   const nextStatus = currentStatus === 'active' ? 'paused' : 'active';
-  if (isDemoMode) {
-    const items = loadFeature('demo', 'challenges', DEMO_CHALLENGES);
-    const next = items.map(c => c.id === id ? { ...c, status: nextStatus } : c);
-    saveFeature('demo', 'challenges', next);
-    return next;
-  }
   await api.updateChallengeStatus(id, nextStatus);
-  return loadChallenges(isDemoMode, userId);
+  return loadChallenges();
 }
 
 export function updateChallengeProgress(challenges, transactions, snapshot) {

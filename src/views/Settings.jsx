@@ -199,7 +199,7 @@ function LayoutPanel({ settings, updateSettings, showAI, up }) {
   );
 }
 
-function AccountPanel({ fullName, email, persona, isDemoMode, questionnaire, updateProfile }) {
+function AccountPanel({ fullName, email, persona, questionnaire, updateProfile }) {
   const [name, setName] = useState(fullName || '');
   const [personaChoice, setPersonaChoice] = useState(persona || 'Salaried employee');
   const [interests, setInterests] = useState(questionnaire?.news_interests || []);
@@ -310,7 +310,6 @@ function AccountPanel({ fullName, email, persona, isDemoMode, questionnaire, upd
 
 function PrivacyPanel({
   handleSignOut,
-  isDemoMode,
   resetAppSettings,
   exportUserData,
   clearAssistantChat,
@@ -373,12 +372,12 @@ function PrivacyPanel({
 
       <SettingCard>
         <SettingRow
-          label={isDemoMode ? 'Exit demo mode' : 'Log out'}
-          hint={isDemoMode ? 'Return to the landing page' : 'Sign out of your FinSight account'}
+          label="Log out"
+          hint="Sign out of your FinSight account"
           action={
             <button type="button" className="fs-btn fs-btn-secondary fs-btn-sm" onClick={handleSignOut} style={{ color: 'var(--fs-danger)' }}>
               <Icon name="logout" size={14} />
-              {isDemoMode ? 'Exit demo' : 'Log out'}
+              Log out
             </button>
           }
         />
@@ -399,8 +398,8 @@ export default function Settings() {
     exportUserData,
     clearAssistantChat,
   } = useApp();
-  const { settings, fullName, user, persona, isDemoMode, questionnaire, activeNav, showAI } = state;
-  const email = user?.email || (isDemoMode ? 'demo@finsight.in' : '');
+  const { settings, fullName, user, persona, questionnaire, activeNav, showAI } = state;
+  const email = user?.email || '';
   const [section, setSection] = useState('general');
 
   function toggleFeature(id) {
@@ -421,7 +420,6 @@ export default function Settings() {
         fullName={fullName}
         email={email}
         persona={persona}
-        isDemoMode={isDemoMode}
         questionnaire={questionnaire}
         updateProfile={updateProfile}
       />
@@ -429,7 +427,6 @@ export default function Settings() {
     privacy: (
       <PrivacyPanel
         handleSignOut={handleSignOut}
-        isDemoMode={isDemoMode}
         resetAppSettings={resetAppSettings}
         exportUserData={exportUserData}
         clearAssistantChat={clearAssistantChat}

@@ -7,20 +7,19 @@ import { fetchAccounts, defaultAccount } from '../lib/accounts';
 const CATEGORIES = ['Food & Dining', 'Groceries', 'Transport', 'Shopping', 'Housing', 'Utilities', 'Entertainment', 'Health', 'Paychecks', 'Other'];
 
 export default function AddTransactionModal({ open, onClose, onSaved }) {
-  const { addTransaction, up, state } = useApp();
-  const { isDemoMode } = state;
+  const { addTransaction, up } = useApp();
   const [form, setForm] = useState({ name: '', amount: '', category: 'Food & Dining', type: 'expense', account: '', isRecurring: false });
   const [accounts, setAccounts] = useState([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    fetchAccounts(isDemoMode).then(list => {
+    fetchAccounts().then(list => {
       setAccounts(list);
       const def = defaultAccount(list);
       setForm(f => ({ ...f, account: def?.name || '' }));
     });
-  }, [open, isDemoMode]);
+  }, [open]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -37,7 +36,7 @@ export default function AddTransactionModal({ open, onClose, onSaved }) {
         isRecurring: form.isRecurring,
         source: form.isRecurring ? 'recurring' : 'manual',
       });
-      if (!isDemoMode && onSaved) await onSaved();
+      if (onSaved) await onSaved();
       onClose();
       setForm({ name: '', amount: '', category: 'Food & Dining', type: 'expense', account: form.account, isRecurring: false });
     } catch (err) {

@@ -18,7 +18,7 @@ import EmptyState from '../components/ui/EmptyState';
 import Icon from '../components/ui/Icon';
 import AddCustomRecurringModal from '../components/AddCustomRecurringModal';
 
-const loadSubs = (isDemo, uid) => fetchSubscriptions(isDemo, uid);
+const loadSubs = () => fetchSubscriptions();
 
 const STREAMING = OTT_SERVICES.filter(s => s.service !== 'Spotify');
 const MUSIC = OTT_SERVICES.filter(s => s.service === 'Spotify');
@@ -41,25 +41,25 @@ export default function Recurring() {
   );
 
   async function handleToggle(service, meta, active) {
-    const next = await toggleSubscription(state.isDemoMode, state.user?.id, service, meta, active);
+    const next = await toggleSubscription(service, meta, active);
     setData(next);
   }
 
   async function saveAmount(service) {
     const val = amountEdits[service];
     if (val == null) return;
-    const next = await updateSubscriptionAmount(state.isDemoMode, state.user?.id, service, val);
+    const next = await updateSubscriptionAmount(service, val);
     setData(next);
     setAmountEdits(e => ({ ...e, [service]: undefined }));
   }
 
   async function handleAddCustom(payload) {
-    const next = await addCustomSubscription(state.isDemoMode, state.user?.id, payload);
+    const next = await addCustomSubscription(payload);
     setData(next);
   }
 
   async function handleRemove(service) {
-    const next = await removeSubscription(state.isDemoMode, state.user?.id, service);
+    const next = await removeSubscription(service);
     setData(next);
     setAmountEdits(e => {
       const copy = { ...e };

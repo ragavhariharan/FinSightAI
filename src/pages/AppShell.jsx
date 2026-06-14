@@ -47,7 +47,7 @@ function formatDate() {
 
 export default function AppShell() {
   const { state, up, setActiveNav, handleSignOut, refreshAppData, setSidebarWidth, setAiPanelWidth, updateSettings } = useApp();
-  const { activeNav, showAI, persona, fullName, isDemoMode, settings } = state;
+  const { activeNav, showAI, persona, fullName, settings } = state;
   const [showAddTx, setShowAddTx] = useState(false);
   const collapsed = settings.sidebarCollapsed;
   const sections = visibleNav(settings);
@@ -124,7 +124,6 @@ export default function AppShell() {
             <div className="fs-subtitle" style={{ fontSize: '0.75rem' }}>{activeNav === 'dashboard' ? formatDate() : meta.subtitle}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {isDemoMode && <span className="fs-badge fs-badge-muted">Demo mode</span>}
             <button className={`fs-btn fs-btn-ai fs-btn-sm ${showAI ? 'active' : ''}`} onClick={() => up({ showAI: !showAI })}>
               <Icon name="message" size={15} />
               {ASSISTANT_NAME}

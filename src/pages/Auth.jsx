@@ -24,7 +24,7 @@ const BENEFITS = [
 ];
 
 export default function Auth() {
-  const { state, up, goTo, tryDemo, submitAuth } = useApp();
+  const { state, up, goTo, submitAuth } = useApp();
   const { authMode, authEmail, authPassword, authName, authLoading, authError } = state;
   const isSignup = authMode === 'signup';
 
@@ -69,7 +69,7 @@ export default function Auth() {
           </div>
           <div className="fs-chat-row">
             <div className="fs-chat-bubble fs-chat-bubble-ai fs-chat-pos-solo" style={{ fontSize: '0.78rem' }}>
-              You spent ₹3,240 on food across 8 transactions. That is 68% of your weekly food budget.
+              Ask about your spending, budgets, or log a transaction in plain language.
             </div>
           </div>
         </div>
@@ -122,12 +122,8 @@ export default function Auth() {
             <div style={{ flex: 1, height: 1, background: 'var(--fs-border)' }} />
           </div>
 
-          <button className="fs-btn fs-btn-secondary" style={{ width: '100%', marginBottom: 12 }} onClick={handleGoogle}>
+          <button className="fs-btn fs-btn-secondary" style={{ width: '100%' }} onClick={handleGoogle}>
             <GoogleIcon /> Continue with Google
-          </button>
-
-          <button className="fs-btn fs-btn-ghost" style={{ width: '100%', fontSize: '0.8125rem' }} onClick={tryDemo}>
-            Continue as demo user
           </button>
 
           <p className="fs-auth-switch" style={{ textAlign: 'center', marginTop: 24, fontSize: '0.875rem', color: 'var(--fs-text-secondary)' }}>

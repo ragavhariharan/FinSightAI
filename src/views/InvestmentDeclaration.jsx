@@ -6,7 +6,7 @@ import { buildDeclaration } from '../lib/investmentDeclaration';
 import Icon from '../components/ui/Icon';
 import { formatRupee } from '../lib/format';
 
-const loadTax = (isDemo, uid) => loadTaxProfile(isDemo, uid);
+const loadTax = () => loadTaxProfile();
 
 export default function InvestmentDeclaration() {
   const { state } = useApp();

@@ -1,16 +1,18 @@
-/** Persist per-user feature data (demo + authenticated) in localStorage */
-export function userKey(isDemoMode, userId) {
-  return isDemoMode ? 'demo' : (userId || 'local');
+/** Persist per-user feature data in localStorage */
+export function userKey(userId) {
+  return userId || 'local';
 }
 
-export function loadFeature(userKey, key, defaults) {
+export function loadFeature(userId, key, fallback) {
   try {
-    const raw = localStorage.getItem(`finsight_${key}_${userKey}`);
+    const raw = localStorage.getItem(`finsight_${userKey(userId)}_${key}`);
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
-  return typeof defaults === 'function' ? defaults() : JSON.parse(JSON.stringify(defaults));
+  return fallback;
 }
 
-export function saveFeature(userKey, key, data) {
-  localStorage.setItem(`finsight_${key}_${userKey}`, JSON.stringify(data));
+export function saveFeature(userId, key, value) {
+  try {
+    localStorage.setItem(`finsight_${userKey(userId)}_${key}`, JSON.stringify(value));
+  } catch { /* ignore */ }
 }

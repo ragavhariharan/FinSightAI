@@ -11,8 +11,8 @@ import AnimatedNumber from '../components/ui/AnimatedNumber';
 import EmptyState from '../components/ui/EmptyState';
 import Icon from '../components/ui/Icon';
 
-const loadNw = (isDemo, uid) => loadNetWorth(isDemo, uid);
-const loadAcc = (isDemo) => fetchAccounts(isDemo);
+const loadNw = () => loadNetWorth();
+const loadAcc = () => fetchAccounts();
 
 export default function NetWorth() {
   const { state, setActiveNav } = useApp();
@@ -24,16 +24,16 @@ export default function NetWorth() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const holdings = await loadHoldings(state.isDemoMode, state.user?.id);
-      const funds = await loadFunds(state.isDemoMode, state.user?.id);
-      const summary = await quoteHoldings(holdings, state.isDemoMode);
+      const holdings = await loadHoldings();
+      const funds = await loadFunds();
+      const summary = await quoteHoldings(holdings);
       if (!cancelled) {
         setStockValue(summary.current);
         setMfValue(funds.reduce((s, f) => s + fundMetrics(f).value, 0));
       }
     })();
     return () => { cancelled = true; };
-  }, [state.isDemoMode, state.user?.id]);
+  }, [state.user?.id]);
 
   const bankTotal = totalBalance(accounts || []);
   const liabilities = (data?.liabilities || []).reduce((s, l) => s + l.amount, 0);

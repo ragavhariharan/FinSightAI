@@ -238,7 +238,7 @@ export default function Dashboard() {
         <EmptyState
           icon="message"
           title="Your dashboard is ready"
-          description={`Log your first transaction manually, upload a CSV during onboarding, or tell ${ASSISTANT_NAME} something like “I spent ₹500 on groceries”.`}
+          description={`Add a transaction manually or tell ${ASSISTANT_NAME} what you spent — your dashboard updates from your real data.`}
           action={<button className="fs-btn fs-btn-primary" onClick={() => up({ showAI: true })}>Open {ASSISTANT_NAME}</button>}
         />
       )}

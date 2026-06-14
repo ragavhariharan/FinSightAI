@@ -1,26 +1,40 @@
 import { supabase } from '../supabase';
 import { currentMonthStart } from '../format';
+import { requireAuthUser } from './auth';
 
 export async function fetchBudgetsWithSpent() {
+  const user = await requireAuthUser();
+
   const { data, error } = await supabase
-    .from('budgets_with_spent')
-    .select('*')
+    .from('budgets')
+    .select('id, category, icon, color, limit_amount')
+    .eq('user_id', user.id)
     .eq('month', currentMonthStart())
     .order('category');
   if (error) throw error;
-  const seen = new Set();
-  return (data || []).filter(b => {
-    if (seen.has(b.category)) return false;
-    seen.add(b.category);
-    return true;
-  }).map(b => ({
+
+  return (data || []).map(b => ({
     id: b.id,
     cat: b.category,
     icon: b.icon || '💰',
     color: b.color || '#6366F1',
-    spent: Number(b.spent) || 0,
+    spent: 0,
     limit: Number(b.limit_amount) || 0,
   }));
+}
+
+export async function updateBudget(id, { limit_amount }) {
+  const user = await requireAuthUser();
+
+  const { data, error } = await supabase
+    .from('budgets')
+    .update({ limit_amount: Number(limit_amount) })
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export async function insertBudget({ category, limit_amount, icon, color }) {
@@ -41,40 +55,4 @@ export async function insertBudget({ category, limit_amount, icon, color }) {
     .single();
   if (error) throw error;
   return data;
-}
-
-export async function seedBudgetsFromPersona(personaDb) {
-  const { data: config, error: cfgErr } = await supabase
-    .from('persona_config')
-    .select('default_budget_template')
-    .eq('persona', personaDb)
-    .single();
-  if (cfgErr) throw cfgErr;
-
-  const template = config?.default_budget_template || [];
-  if (!template.length) return;
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
-  const { data: existing } = await supabase
-    .from('budgets')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('month', currentMonthStart())
-    .limit(1);
-
-  if (existing?.length) return;
-
-  const rows = template.map(b => ({
-    user_id: user.id,
-    category: b.category,
-    icon: b.icon,
-    color: b.color,
-    limit_amount: b.limit_amount,
-    month: currentMonthStart(),
-  }));
-
-  const { error } = await supabase.from('budgets').insert(rows);
-  if (error) throw error;
 }

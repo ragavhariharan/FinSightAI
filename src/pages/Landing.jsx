@@ -27,7 +27,7 @@ const PERSONAS = [
 ];
 
 export default function Landing() {
-  const { goTo, tryDemo } = useApp();
+  const { goTo } = useApp();
 
   return (
     <div className="fs-page">
@@ -62,8 +62,8 @@ export default function Landing() {
                   <button className="fs-btn fs-btn-primary fs-hero-cta" onClick={() => goTo('auth', { authMode: 'signup' })}>
                     Get started free
                   </button>
-                  <button className="fs-btn fs-btn-secondary fs-hero-cta" onClick={tryDemo}>
-                    Try live demo
+                  <button className="fs-btn fs-btn-secondary fs-hero-cta" onClick={() => goTo('auth', { authMode: 'login' })}>
+                    Sign in
                   </button>
                 </div>
               </ScrollReveal>
@@ -230,9 +230,6 @@ export default function Landing() {
                 <button className="fs-btn fs-btn-primary" style={{ padding: '15px 36px', fontSize: '1rem' }} onClick={() => goTo('auth', { authMode: 'signup' })}>
                   Create free account
                 </button>
-                <button className="fs-btn fs-btn-secondary" style={{ padding: '15px 36px', fontSize: '1rem' }} onClick={tryDemo}>
-                  Explore demo
-                </button>
               </div>
               </div>
             </ScrollReveal>
@@ -249,7 +246,6 @@ export default function Landing() {
           <div className="fs-landing-footer-col">
             <h4>Product</h4>
             <button onClick={() => goTo('auth', { authMode: 'signup' })}>Get started</button>
-            <button onClick={tryDemo}>Live demo</button>
             <button onClick={() => goTo('auth', { authMode: 'login' })}>Sign in</button>
           </div>
           <div className="fs-landing-footer-col">
